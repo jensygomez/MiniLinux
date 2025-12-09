@@ -92,6 +92,161 @@ run_lab() {
 # CARGAR LABS
 load_labs
 
+add_new_labs() {
+    clear
+    echo "➕ ADICIONAR NUEVOS LABORATORIOS"
+    echo "================================"
+    
+    # Módulos RHCSA
+    declare -A modules=(
+        ["1"]="Essential Tools"
+        ["2"]="Running Systems" 
+        ["3"]="Local Storage"
+        ["4"]="File Systems"
+        ["5"]="Deploy Systems"
+        ["6"]="Networking"
+    )
+    
+    declare -A submodules=(
+        ["1.1"]="Shell y Operaciones Básicas"
+        ["1.2"]="Búsqueda y Documentación"
+        ["1.3"]="Expansiones y Redirecciones"
+        ["1.4"]="Procesos y Jobs"
+        ["1.5"]="Editores de Texto (vi/vim)"
+        ["2.1"]="Gestión de Usuarios y Grupos"
+        ["2.2"]="Permisos y Propiedad de Archivos"
+        ["2.3"]="Control de Acceso (ACLs y Atributos)"
+        ["2.4"]="Planificación de Tareas (Cron/Anacron)"
+        ["2.5"]="Administración de Paquetes (RPM/DNF/YUM)"
+        ["3.1"]="Particionamiento de Discos"
+        ["3.2"]="Administración Lógica de Volúmenes (LVM)"
+        ["3.3"]="Cifrado de Dispositivos (LUKS)"
+        ["3.4"]="Gestión de RAID por Software"
+        ["4.1"]="Creación y Montaje de Sistemas de Archivos"
+        ["4.2"]="Configuración Persistente (fstab)"
+        ["4.3"]="Cuotas de Disco"
+        ["4.4"]="Administración de Swap"
+        ["4.5"]="Mantenimiento de Sistemas de Archivos"
+        ["5.1"]="Arranque del Sistema y Gestor de Arranque (GRUB2)"
+        ["5.2"]="Servicios y Daemons (systemd)"
+        ["5.3"]="Contenedores Básicos (Podman)"
+        ["5.4"]="Registro del Sistema (journald)"
+        ["6.1"]="Configuración de Red (NetworkManager)"
+        ["6.2"]="Resolución de Nombres (DNS/Hosts)"
+        ["6.3"]="Firewall y Seguridad (firewalld)"
+        ["6.4"]="SELinux Básico"
+    )
+    
+    echo "MÓDULOS RHCSA:"
+    for key in "${!modules[@]}"; do
+        echo " [$key] ${modules[$key]}"
+    done
+    echo
+    read -p "Módulo (1-6): " mod_num
+    
+    clear
+    echo "SUBMÓDULOS ${modules[$mod_num]}:"
+    for key in "${!submodules[@]}"; do
+        if [[ "$key" == "$mod_num."* ]]; then
+            echo " [$key] ${submodules[$key]}"
+        fi
+    done
+    echo
+    read -p "Submódulo: " sub_num
+    
+    MODULE="${modules[$mod_num]}"
+    SUBMODULE="${submodules[$sub_num]}"
+    LAB_PATH="labs/${mod_num}_${sub_num}"
+    
+    mkdir -p "$LABS/$LAB_PATH"
+    
+    echo
+    echo "📝 Editando: $LAB_PATH-master.lab"
+    echo "Pega tu formato LVM labs → Ctrl+O → Enter → Ctrl+X"
+    echo
+    nano "$LABS/$LAB_PATH-master.lab"
+    
+    echo "📥 IMPORTANDO $LAB_PATH-master.lab..."
+    parse_lab_file "$LABS/$LAB_PATH-master.lab" "$mod_num.$sub_num"
+    
+    load_labs  # Recargar lista
+    echo "✅ $(wc -l < <(tail -n +2 "$DATA/labs_index.db")) labs importados!"
+    sleep 2
+}
+
+parse_lab_file() {
+    local file="$1" module="$2"
+    local lab_count=0
+    
+    # Crear directorio del módulo
+    local lab_dir="$LABS/${module//./_}"
+    mkdir -p "$lab_dir"
+    
+    awk '
+    BEGIN { lab_id=""; in_lab=false; in_setup=false; in_scenario=false; in_validations=false; }
+    
+    # Detectar nuevo LAB
+    /^[ \t]*\[LAB_[0-9]+\]/ {
+        if (in_lab && lab_id != "") {
+            # Guardar archivos previos
+            close(scenario_file);
+            close(validate_file);
+        }
+        in_lab=true;
+        gsub(/[\[\]]/, "", $0);
+        lab_num = substr($0, 6);
+        lab_id = "lab-" module "-" sprintf("%03d", lab_num);
+        next;
+    }
+    
+    # LAB metadata
+    /^[ \t]*ID[ \t]*=/ { id=substr($0, index($0,$3)); gsub(/"/, "", id); }
+    /^[ \t]*TITLE[ \t]*=/ { title=substr($0, index($0,$3)); gsub(/"/, "", title); }
+    /^[ \t]*DIFICULTAD[ \t]*=/ { diff=$3; }
+    /^[ \t]*PUNTOS[ \t]*=/ { pts=$3; }
+    
+    # SETUP
+    /^[ \t]*\[LAB_[0-9]+_SETUP\]/ { in_setup=true; next; }
+    
+    # SCENARIO  
+    /^[ \t]*\[LAB_[0-9]+_SCENARIO\]/ { 
+        in_scenario=true; 
+        scenario_file=lab_dir "/" id "/scenario.txt";
+        print "=== LAB " id ": " title " ===" > scenario_file;
+        next; 
+    }
+    
+    # VALIDACIONES
+    /^[ \t]*\[LAB_[0-9]+_VALIDACIONES\]/ { 
+        in_validations=true; 
+        validate_file=lab_dir "/" id "/validate.sh";
+        print "#!/bin/bash" > validate_file;
+        print "echo \"🔍 VALIDANDO " id "...\"" >> validate_file;
+        next;
+    }
+    
+    in_scenario { print > scenario_file; }
+    in_setup || in_validations { print > validate_file; }
+    
+    END {
+        if (in_lab && lab_id != "") {
+            close(scenario_file);
+            close(validate_file);
+            print lab_id "|" lab_dir "/" id "|" title "|" diff "|" pts "|🔴 Nuevo" >> "'"$DATA/labs_index.db"'";
+            lab_count++;
+        }
+    }' "$file"
+    
+    # Permisos
+    find "$lab_dir" -name "*.sh" -exec chmod +x {} \;
+    echo "$lab_count labs creados en $lab_dir"
+}
+
+
+
+
+
+
 page=1
 while true; do
     show_labs_paginated "$page"
@@ -133,5 +288,9 @@ while true; do
                 sleep 1
             fi
             ;;
+        a)
+            add_new_labs
+            ;;
+
     esac
 done
