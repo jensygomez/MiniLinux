@@ -1,31 +1,24 @@
 #!/usr/bin/env bash
 
-BASE="/opt/rhcsa-mini-linux"
-DATA="$BASE/data"
-BIN="$BASE/bin"
-LABS="$BASE/labs"
+BASE_DIR="$HOME/MiniLinux"
 
 while true; do
     clear
     echo "==============================================="
     echo "      RHCSA MINI LINUX — MENU PRINCIPAL"
     echo "==============================================="
-    echo "1) Listar laboratórios"
-    echo "2) Adicionar novo laboratório"
-    echo "3) Editar laboratório"
-    echo "4) Excluir laboratório"
-    echo "5) Ver progresso"
+    echo "1) Laboratórios"
+    echo "2) Ver Progreso"
+    echo "5) Configuraciones"
     echo "6) Sair"
-    echo
-    read -p "Escolha uma opção: " op
+    echo 
+    read -p "Seleccione opción: " op
 
     case "$op" in
-        1) bash "$BIN/list_labs.sh" ;;
-        2) bash "$BIN/lab_add.sh" ;;
-        3) bash "$BIN/lab_edit.sh" ;;
-        4) bash "$BIN/lab_delete.sh" ;;
-        5) bash "$BIN/show_progress.sh" ;;
+        1) "$BASE_DIR/bin/menu_labs.sh" ;;
+        2) "$BASE_DIR/bin/show_progress.sh" ;;
+        5) "$BASE_DIR/bin/menu_config.sh" ;;
         6) exit 0 ;;
-        *) echo "Opção inválida" ; sleep 1 ;;
+        *) echo "Opción inválida"; sleep 1 ;;
     esac
 done
