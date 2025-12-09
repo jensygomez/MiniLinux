@@ -1,366 +1,314 @@
 #!/usr/bin/env bash
-# install_full_system.sh
-# Instala / actualiza MiniLinux: módulos, scripts y DB (BASH puro)
-set -euo pipefail
 
-BASE="$HOME/MiniLinux"
-BIN="$BASE/bin"
+# =======================================================
+#  RHCSA MINI LINUX — INSTALADOR COMPLETO OFICIAL
+#  Autor: Jensy Gomez (2025) - Versión Full con Labs + SSH
+#  100% Bash puro - RHCSA Trainer Automático
+# =======================================================
+
+BASE="/opt/rhcsa-mini-linux"
+
+echo "🚀 Instalando RHCSA Mini Linux FULL em: $BASE"
+sudo mkdir -p "$BASE"
+
+# ==========================
+# Criando estructura completa
+# ==========================
+echo "🔧 Criando diretórios..."
+sudo mkdir -p "$BASE/bin"
+sudo mkdir -p "$BASE/data"
+sudo mkdir -p "$BASE/labs"
+sudo mkdir -p "$BASE/logs/lab_runs"
+sudo mkdir -p "$BASE/system"
+sudo mkdir -p "$BASE/vm_scripts"
+
+# ==========================
+# Base de dados inicial
+# ==========================
+echo "📁 Criando base de dados..."
+sudo tee "$BASE/data/labs_index.db" >/dev/null <<'EOF'
+# id_lab=path|title|difficulty|points
+lvm-001|/opt/rhcsa-mini-linux/labs/lvm-001|PV básico|1|20
+lvm-002|/opt/rhcsa-mini-linux/labs/lvm-002|VG básico|2|30
+users-001|/opt/rhcsa-mini-linux/labs/users-001|Crear usuário|1|15
+network-001|/opt/rhcsa-mini-linux/labs/network-001|Configurar IP|2|25
+EOF
+
+sudo tee "$BASE/data/vm_config.db" >/dev/null <<'EOF'
+VM_IP="192.168.122.143"
+VM_USER="student"
+VM_PASS="student"
+EOF
+
+sudo tee "$BASE/data/progress.db" >/dev/null <<'EOF'
+# user_lab_id=attempts|completed|score
+EOF
+
+# ==========================
+# UTILS - Funciones base
+# ==========================
+sudo tee "$BASE/bin/utils.sh" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+
+BASE="/opt/rhcsa-mini-linux"
 DATA="$BASE/data"
+BIN="$BASE/bin"
 LABS="$BASE/labs"
-SCRIPTS="$BASE/Scripts"
 
-echo "Instalando/actualizando MiniLinux en: $BASE"
-
-mkdir -p "$BIN" "$DATA" "$LABS" "$SCRIPTS" "$BASE/logs/lab_runs" "$BASE/system"
-
-# ------------------------
-# Crear estructura de módulos (carpetas)
-# ------------------------
-declare -a MODULES=( \
-  "local_storage" \
-  "users_groups" \
-  "networking" \
-  "security" \
-  "containers" \
-  "scripting" \
-)
-
-for m in "${MODULES[@]}"; do
-  mkdir -p "$LABS/$m"
-done
-
-# ------------------------
-# Crear base de datos inicial (si no existe)
-# ------------------------
-: > "$DATA/labs_index.db"      # truncar o crear
-if ! grep -q "^# created=" "$DATA/metadata.db" 2>/dev/null; then
-  cat > "$DATA/metadata.db" <<EOF
-# created=$(date +"%F %T %z")
-system_name=RHCSA Mini Linux
-version=1.0
-EOF
-fi
-
-: > "$DATA/progress.db"
-: > "$DATA/stats.db"
-
-# ------------------------
-# Instalar menu_modulos.sh (sincronizado con carpetas)
-# ------------------------
-cat > "$BIN/menu_modulos.sh" <<'EOF'
-#!/usr/bin/env bash
-# menu_modulos.sh — devuelve MODULO_ID y MODULE_DIR_NAME y MODULO_NOMBRE
-select_modulo() {
-  clear
-  echo "============================================================="
-  echo "             RHCSA MINI LINUX — SELECCIONAR MÓDULO"
-  echo "============================================================="
-  echo ""
-  echo "Seleccione a qué módulo pertenece el laboratorio:"
-  echo ""
-  echo "  1) Local Storage (LVM, FS, Mounts)"
-  echo "  2) Users & Groups"
-  echo "  3) Networking"
-  echo "  4) Security (SELinux/Firewalld)"
-  echo "  5) Containers"
-  echo "  6) Scripting / Automation"
-  echo ""
-  echo "  0) Volver"
-  echo ""
-  read -rp "Digite la opción: " opc
-  case "$opc" in
-    1) MODULO_ID=1; MODULE_DIR_NAME="local_storage"; MODULO_NOMBRE="Local Storage" ;;
-    2) MODULO_ID=2; MODULE_DIR_NAME="users_groups"; MODULO_NOMBRE="Users & Groups" ;;
-    3) MODULO_ID=3; MODULE_DIR_NAME="networking"; MODULO_NOMBRE="Networking" ;;
-    4) MODULO_ID=4; MODULE_DIR_NAME="security"; MODULO_NOMBRE="Security" ;;
-    5) MODULO_ID=5; MODULE_DIR_NAME="containers"; MODULO_NOMBRE="Containers" ;;
-    6) MODULO_ID=6; MODULE_DIR_NAME="scripting"; MODULO_NOMBRE="Scripting" ;;
-    0) return 1 ;;
-    *) echo "Opción inválida."; sleep 1; select_modulo; return ;;
-  esac
-  return 0
-}
-EOF
-chmod +x "$BIN/menu_modulos.sh"
-
-# ------------------------
-# Instalar add_lab.sh (parser + instalador desde archivo temporal)
-# ------------------------
-cat > "$BIN/add_lab.sh" <<'EOF'
-#!/usr/bin/env bash
-# add_lab.sh — abrir nano, permitir pegar varios LAB_XXX, parsear e instalar
-set -euo pipefail
-
-BASE_DIR="$HOME/MiniLinux"
-LABS_DIR="$BASE_DIR/labs"
-DATA_DIR="$BASE_DIR/data"
-TMP_FILE="/tmp/new_lab_$$.lab"
-
-# ------------------------------------------
-# EXTRACTOR ROBUSTO DE BLOQUES (NUEVO)
-# ------------------------------------------
-extract_block() {
-    local file="$1"
-    local section="$2"
-
-    awk -v start="$section" '
-        # Comienza cuando encuentra la sección exacta
-        $0 ~ "^\\[" start "\\]" {capture=1; next}
-
-        # Termina al encontrar otra sección
-        capture && $0 ~ "^\\[[A-Z0-9_]+\\]" {exit}
-
-        # Imprime contenido interno
-        capture {print}
-    ' "$file"
+draw_line() {
+    printf '%*s\n' "${1:-50}" '' | tr ' ' '-'
 }
 
-# pedir módulo
-source "$BASE_DIR/bin/menu_modulos.sh" || { echo "menu_modulos missing"; exit 1; }
-if ! select_modulo; then
-  echo "Operación cancelada."
-  exit 1
-fi
-
-MODULE="$MODULE_DIR_NAME"
-MODULE_NAME="$MODULO_NOMBRE"
-MODULE_PATH="$LABS_DIR/$MODULE"
-
-mkdir -p "$MODULE_PATH"
-
-echo
-echo "Se abrirá el editor. Pegue aquí el archivo con uno o varios bloques [LAB_XXX]."
-echo "Al guardar y salir, el sistema procesará el archivo y creará los labs."
-read -rp "ENTER para abrir el editor..." _
-: > "$TMP_FILE"
-${EDITOR:-nano} "$TMP_FILE"
-
-# validar archivo
-if [ ! -s "$TMP_FILE" ]; then
-  echo "Archivo vacío. Cancelando."
-  rm -f "$TMP_FILE"
-  exit 1
-fi
-
-# detectar bloques [LAB_###]
-LAB_TAGS=$(grep -oE '^\[LAB_[0-9]{3}\]' "$TMP_FILE" | sed 's/\[//;s/\]//' | uniq)
-
-if [ -z "$LAB_TAGS" ]; then
-  echo "No se detectaron bloques [LAB_###]."
-  rm -f "$TMP_FILE"
-  exit 1
-fi
-
-echo "Se detectaron los siguientes bloques:"
-echo "$LAB_TAGS"
-echo
-
-# FUNCIÓN extract_field
-extract_field() {
-  local block="$1" file="$2" key="$3"
-  awk -v b="$block" -v k="$key" '
-    $0 == "["b"]"{p=1; next}
-    /^\[/{p=0}
-    p && $0 ~ "^"k"[[:space:]]*=" {
-       sub("[^=]*=[[:space:]]*","",$0); print; exit
-    }
-  ' "$file"
+print_table_header() {
+    echo "ID    | Título                    | Dific. | Pts"
+    draw_line 50
 }
 
-# procesar cada LAB
-for tag in $LAB_TAGS; do
-  num=$(echo "$tag" | sed 's/LAB_//')
-  LAB_PREFIX="LAB_${num}"
-
-  ID_RAW=$(extract_field "$tag" "$TMP_FILE" "ID" || true)
-  ID=$(echo "$ID_RAW" | tr -d ' ')
-  [ -z "$ID" ] && ID="lab-${MODULE}-${num}"
-
-  TITLE=$(extract_field "$tag" "$TMP_FILE" "TITLE" || true)
-  TITLE=${TITLE:-"Untitled"}
-
-  TARGET_DIR="$MODULE_PATH/$ID"
-
-  if [ -d "$TARGET_DIR" ]; then
-    echo "ATENCIÓN: $TARGET_DIR ya existe."
-    read -rp "Desea [O]verwrite / [S]kip / [R]ename ? (O/S/R): " choice
-    case "$choice" in
-      O|o) rm -rf "$TARGET_DIR" ;;
-      S|s) echo "Omitiendo $ID"; continue ;;
-      R|r) read -rp "Nuevo ID: " newid; ID="$newid"; TARGET_DIR="$MODULE_PATH/$ID" ;;
-      *) echo "Opción inválida. Omitiendo."; continue ;;
-    esac
-  fi
-
-  mkdir -p "$TARGET_DIR"
-
-  # METADATA
-  {
-    echo "ID=$ID"
-    echo "TITLE=$TITLE"
-    echo "MODULE=$MODULE"
-    echo "MODULE_NAME=$MODULE_NAME"
-    echo "CREATED=$(date +%F_%T)"
-  } > "$TARGET_DIR/metadata.db"
-
-  # ------------------------------------------
-  # BLOQUES CORRECTOS (NUEVO SISTEMA)
-  # ------------------------------------------
-
-  # SCENARIO
-  extract_block "$TMP_FILE" "${LAB_PREFIX}_SCENARIO" > "$TARGET_DIR/scenario.txt"
-
-  # SETUP
-  extract_block "$TMP_FILE" "${LAB_PREFIX}_SETUP" > "$TARGET_DIR/setup.sh"
-  chmod +x "$TARGET_DIR/setup.sh"
-
-  # VALIDACIONES
-  extract_block "$TMP_FILE" "${LAB_PREFIX}_VALIDACIONES" > "$TARGET_DIR/validations.sh"
-  chmod +x "$TARGET_DIR/validations.sh"
-
-  # actualizar índice
-  echo "${ID}|${MODULE}|${TITLE}|$(date +%F)" >> "$DATA_DIR/labs_index.db"
-
-  echo "Instalado: $ID -> $TARGET_DIR"
-done
-
-rm -f "$TMP_FILE"
-echo
-echo "Importación completada."
-echo "Presione ENTER para volver al menú..."
-read -r
-EOF
-
-chmod +x "$BIN/add_lab.sh"
-
-
-# ------------------------
-# Instalar import_batch.sh (importar un archivo ya existente sin abrir nano)
-# ------------------------
-cat > "$BIN/import_batch.sh" <<'EOF'
-#!/usr/bin/env bash
-# import_batch.sh <file_with_multiple_labs>
-set -euo pipefail
-if [ $# -lt 1 ]; then
-  echo "Uso: import_batch.sh /ruta/al/archivo.lab"
-  exit 1
-fi
-SRC="$1"
-BASE_DIR="$HOME/MiniLinux"
-DATA_DIR="$BASE_DIR/data"
-BIN_DIR="$BASE_DIR/bin"
-LABS_DIR="$BASE_DIR/labs"
-
-if [ ! -f "$SRC" ]; then
-  echo "Archivo no encontrado: $SRC"
-  exit 1
-fi
-
-# default module (ask user)
-source "$BIN_DIR/menu_modulos.sh"
-if ! select_modulo; then
-  echo "Cancelado."
-  exit 1
-fi
-MODULE="$MODULE_DIR_NAME"
-MODULE_PATH="$LABS_DIR/$MODULE"
-mkdir -p "$MODULE_PATH"
-
-# reuse add_lab parsing logic by copying to /tmp and calling add_lab.sh with module preselected
-TMPF="/tmp/import_batch_$$.lab"
-cp "$SRC" "$TMPF"
-
-# parse blocks
-LAB_TAGS=$(grep -oE '^\[LAB_[0-9]{3}\]' "$TMPF" | sed 's/\[//;s/\]//' | uniq)
-if [ -z "$LAB_TAGS" ]; then
-  echo "No se detectaron bloques [LAB_###]"
-  rm -f "$TMPF"
-  exit 1
-fi
-
-for tag in $LAB_TAGS; do
-  num=$(echo "$tag" | sed 's/LAB_//')
-  LAB_PREFIX="LAB_${num}"
-  ID=$(awk -v b="$LAB_PREFIX" ' $0 == "["b"]" {p=1; next} /^\[/ {p=0} p && /^ID[[:space:]]*=/ {sub("^[^=]*=[[:space:]]*",""); print; exit}' "$TMPF" | tr -d ' ')
-  TITLE=$(awk -v b="$LAB_PREFIX" ' $0 == "["b"]" {p=1; next} /^\[/ {p=0} p && /^TITLE[[:space:]]*=/ {sub("^[^=]*=[[:space:]]*",""); print; exit}' "$TMPF")
-  [ -z "$ID" ] && ID="lab-${MODULE}-${num}"
-  TARGET_DIR="$MODULE_PATH/$ID"
-  mkdir -p "$TARGET_DIR"
-  awk "/\[$LAB_PREFIX\_SCENARIO\]/,/\[/{if(\$0 !~ /\\[$LAB_PREFIX\\_SCENARIO\\]|\\[/) print}" "$TMPF" > "$TARGET_DIR/scenario.txt" 2>/dev/null || true
-  awk "/\[$LAB_PREFIX\_SETUP\]/,/\[/{if(\$0 !~ /\\[$LAB_PREFIX\\_SETUP\\]|\\[/) print}" "$TMPF" > "$TARGET_DIR/setup.sh" 2>/dev/null || true
-  chmod +x "$TARGET_DIR/setup.sh" 2>/dev/null || true
-  awk "/\[$LAB_PREFIX\_VALIDACIONES\]/,/\[/{if(\$0 !~ /\\[$LAB_PREFIX\\_VALIDACIONES\\]|\\[/) print}" "$TMPF" > "$TARGET_DIR/validations.sh" 2>/dev/null || true
-  chmod +x "$TARGET_DIR/validations.sh" 2>/dev/null || true
-  echo "${ID}|${MODULE}|${TITLE}|$(date +%F)" >> "$DATA_DIR/labs_index.db"
-  echo "Importado: $ID"
-done
-
-rm -f "$TMPF"
-echo "Batch import finalizado."
-EOF
-chmod +x "$BIN/import_batch.sh"
-
-# ------------------------
-# Actualizar menu_labs.sh (mantener tu lógica, asegurar llamada a add_lab.sh)
-# ------------------------
-cat > "$BIN/menu_labs.sh" <<'EOF'
-#!/usr/bin/env bash
-BASE_DIR="$HOME/MiniLinux"
-DB="$BASE_DIR/data/labs_index.db"
-while true; do
-  clear
-  echo "==============================================="
-  echo "      RHCSA MINI LINUX — LABORATORIOS"
-  echo "==============================================="
-  echo
-  if [ -f "$DB" ]; then
-    printf "%-5s %-10s %-40s\n" "ID" "Módulo" "Nombre"
-    printf "%-5s %-10s %-40s\n" "-----" "----------" "----------------------------------------"
-    head -n 20 "$DB" | while IFS='|' read -r id modulo nombre date; do
-      printf "%-5s %-10s %-40s\n" "$id" "$modulo" "$nombre"
+print_labs_table() {
+    grep -v "^#" "$DATA/labs_index.db" | while IFS='|' read -r id path title diff pts; do
+        echo " $id   | $title                  | $diff   | $pts"
     done
-  else
-    echo "(sin laboratorios registrados)"
-  fi
-  echo
-  echo "MostrarCompleta   Adicionar   Editar   Excluir   Volver"
-  echo
-  read -p "Seleccione opción: " op
-  case "$op" in
-    MostrarCompleta|mostrar|m) "$BASE_DIR/bin/list_labs.sh"; read -p "ENTER para continuar..." ;;
-    Adicionar|adicionar|a) "$BASE_DIR/bin/add_lab.sh" ;;
-    Editar|editar|e) "$BASE_DIR/bin/manage_labs.sh" ;;
-    Excluir|excluir|x) "$BASE_DIR/bin/manage_labs.sh" ;;
-    Volver|volver|v) exit 0 ;;
-    *) echo "Opción inválida"; sleep 1 ;;
-  esac
+}
+
+get_valid_input() {
+    local valid_opts="$1"
+    local prompt="$2"
+    local choice
+    
+    while true; do
+        read -p "$prompt" -n1 choice
+        echo
+        if [[ "${choice,,}" =~ ^[$valid_opts]$ ]]; then
+            echo "$choice"
+            return 0
+        fi
+        echo "❌ Opção inválida! Use: [$valid_opts]"
+        sleep 1
+    done
+}
+
+ssh_exec() {
+    source "$DATA/vm_config.db"
+    sshpass -p "$VM_PASS" ssh -o StrictHostKeyChecking=no "$VM_USER@$VM_IP" "$1" 2>/dev/null
+}
+
+ssh_setup_lab() {
+    local lab_id="$1"
+    echo "🔧 Configurando lab $lab_id na VM..."
+    ssh_exec "sudo rm -rf /tmp/lab_* 2>/dev/null"
+    ssh_exec "sudo mkdir -p /tmp/lab_$lab_id"
+    ssh_exec "sudo chown $VM_USER:$VM_USER /tmp/lab_$lab_id"
+}
+
+ssh_validate_lab() {
+    local lab_id="$1"
+    local validation_script="$LABS/$lab_id/validate.sh"
+    if [[ -f "$validation_script" ]]; then
+        ssh_exec "bash -s" < "$validation_script"
+    else
+        echo "❌ Script de validação não encontrado"
+    fi
+}
+EOF
+sudo chmod +x "$BASE/bin/utils.sh"
+
+# ==========================
+# MENU PRINCIPAL SIMPLIFICADO
+# ==========================
+sudo tee "$BASE/bin/menu.sh" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+
+source "$BASE/bin/utils.sh"
+
+show_main_menu() {
+    clear
+    echo "==============================================="
+    echo "      🚀 RHCSA MINI LINUX — MENU PRINCIPAL"
+    echo "==============================================="
+    echo "[t] Treinamento (Labs + VM SSH)"
+    echo "[p] Progresso"
+    echo "[c] Configurar VM SSH"
+    echo "[s] Sair"
+    echo
+}
+
+while true; do
+    show_main_menu
+    choice=$(get_valid_input "tpc s" "Escolha (t,p,c,s): ")
+    
+    case "${choice,,}" in
+        t) bash "$BASE/bin/labs_menu.sh" ;;
+        p) bash "$BASE/bin/show_progress.sh" ;;
+        c) bash "$BASE/bin/vm_config.sh" ;;
+        s) exit 0 ;;
+    esac
 done
 EOF
-chmod +x "$BIN/menu_labs.sh"
+sudo chmod +x "$BASE/bin/menu.sh"
 
-# ------------------------
-# Install helper scripts (minimal list_labs.sh if missing)
-# ------------------------
-cat > "$BIN/list_labs.sh" <<'EOF'
+# ==========================
+# MENU DE LABORATORIOS (CRUD + SSH)
+# ==========================
+sudo tee "$BASE/bin/labs_menu.sh" >/dev/null <<'EOF'
 #!/usr/bin/env bash
-DB="$HOME/MiniLinux/data/labs_index.db"
-if [ ! -f "$DB" ]; then echo "No hay labs."; exit 0; fi
-clear
-echo "LISTA DE LABS (index)"
-echo "---------------------------------"
-nl -ba "$DB" | sed 's/^/    /'
-echo
-read -p "ENTER para volver..."
+
+source "$BASE/bin/utils.sh"
+
+show_labs_menu() {
+    clear
+    echo "🔬 LABORATÓRIOS DISPONÍVEIS"
+    echo "=========================="
+    print_table_header
+    print_labs_table
+    echo
+    echo "[1-9] Estudar lab     [a] Adicionar"
+    echo "[e] Editar            [x] Excluir"
+    echo "[b] Voltar"
+}
+
+lab_select() {
+    local lab_id="$1"
+    echo "🚀 Iniciando $lab_id..."
+    
+    # 1. Configurar VM
+    ssh_setup_lab "$lab_id"
+    
+    # 2. Mostrar cenário
+    if [[ -f "$LABS/$lab_id/scenario.txt" ]]; then
+        echo "📖 Cenário:"
+        cat "$LABS/$lab_id/scenario.txt"
+    fi
+    
+    echo "💻 Conecte: ssh $VM_USER@$VM_IP"
+    echo "Execute os comandos e pressione ENTER para validar..."
+    read
+    
+    # 3. Validar
+    ssh_validate_lab "$lab_id"
+    read -p "ENTER para continuar..."
+}
+
+while true; do
+    show_labs_menu
+    choice=$(get_valid_input "123456789aexb" "Opção: ")
+    
+    case "${choice,,}" in
+        1) lab_select "lvm-001" ;;
+        2) lab_select "lvm-002" ;;
+        3) lab_select "users-001" ;;
+        4) lab_select "network-001" ;;
+        a) echo "Adicionar lab... (futuro)" ; sleep 2 ;;
+        e) echo "Editar lab... (futuro)" ; sleep 2 ;;
+        x) echo "Excluir lab... (futuro)" ; sleep 2 ;;
+        b) exit 0 ;;
+    esac
+done
 EOF
-chmod +x "$BIN/list_labs.sh"
+sudo chmod +x "$BASE/bin/labs_menu.sh"
 
-# ------------------------
-# Final: permisos y mensaje
-# ------------------------
-chmod -R 755 "$BIN" 2>/dev/null || true
-chmod -R 755 "$LABS" 2>/dev/null || true
+# ==========================
+# CONFIGURACION VM SSH
+# ==========================
+sudo tee "$BASE/bin/vm_config.sh" >/dev/null <<'EOF'
+#!/usr/bin/env bash
 
-echo "Instalación completada."
-echo "Para iniciar el menú: $BIN/menu_labs.sh"
-echo "Para importar un archivo ya creado: $BIN/import_batch.sh /ruta/al/archivo"
-echo "Para agregar manualmente (editar/pegar): $BIN/add_lab.sh"
+source "$BASE/bin/utils.sh"
+source "$DATA/vm_config.db" 2>/dev/null || true
+
+echo "🔧 CONFIGURAÇÃO VM SSH"
+draw_line
+
+if [[ -z "$VM_IP" ]]; then
+    echo "🔧 Primeira configuração:"
+    read -p "IP/Host: " VM_IP
+    read -p "Usuário: " VM_USER
+    read -s -p "Senha: " VM_PASS; echo
+else
+    echo "Atual: $VM_USER@$VM_IP"
+    read -p "IP [$VM_IP]: " new_ip
+    [[ -n "$new_ip" ]] && VM_IP="$new_ip"
+    
+    read -p "Usuário [$VM_USER]: " new_user
+    [[ -n "$new_user" ]] && VM_USER="$new_user"
+    
+    read -s -p "Senha [Enter=mantém]: " new_pass; echo
+    [[ -n "$new_pass" ]] && VM_PASS="$new_pass"
+fi
+
+cat > "$DATA/vm_config.db" << EOF
+VM_IP="$VM_IP"
+VM_USER="$VM_USER"
+VM_PASS="$VM_PASS"
+EOF
+
+echo "✅ Configurado: $VM_USER@$VM_IP"
+echo "💡 Teste: sshpass -p '$VM_PASS' ssh -o StrictHostKeyChecking=no $VM_USER@$VM_IP 'whoami'"
+sleep 3
+EOF
+sudo chmod +x "$BASE/bin/vm_config.sh"
+
+# ==========================
+# PROGRESSO
+# ==========================
+sudo tee "$BASE/bin/show_progress.sh" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+
+source "$BASE/bin/utils.sh"
+
+clear
+echo "📊 PROGRESSO RHCSA"
+draw_line
+echo "Total labs: $(grep -v '^#' "$DATA/labs_index.db" | wc -l)"
+echo "Completos: 0 (futuro)"
+echo
+print_table_header
+print_labs_table
+echo
+read -p "ENTER para voltar..."
+EOF
+sudo chmod +x "$BASE/bin/show_progress.sh"
+
+# ==========================
+# TEMPLATES DE LABS
+# ==========================
+sudo tee "$BASE/labs/lvm-001/scenario.txt" >/dev/null <<'EOF'
+Crie um Physical Volume básico:
+$ sudo pvcreate /dev/loop1
+$ pvs
+EOF
+
+sudo tee "$BASE/labs/lvm-001/validate.sh" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+if pvs | grep -q loop1; then
+    echo "✅ PV criado corretamente!"
+else
+    echo "❌ PV não encontrado"
+fi
+EOF
+
+sudo chmod +x "$BASE/labs/lvm-001/validate.sh"
+
+# ==========================
+# SSHpass (requerido)
+# ==========================
+sudo apt update >/dev/null 2>&1
+sudo apt install -y sshpass >/dev/null 2>&1
+
+# ==========================
+# Startup script
+# ==========================
+sudo tee /usr/local/bin/rhcsa-mini >/dev/null <<'EOF'
+#!/bin/bash
+cd /opt/rhcsa-mini-linux/bin
+bash menu.sh
+EOF
+sudo chmod +x /usr/local/bin/rhcsa-mini
+
+echo "✅ INSTALAÇÃO COMPLETA!"
+echo "======================"
+echo "👉 rhcsa-mini          # Menu principal"
+echo "👉 rhcsa-mini → c       # Configurar VM"
+echo "👉 rhcsa-mini → t → 1   # Lab LVM-001"
+echo ""
+echo "💻 VM padrão: student@192.168.122.143"
+echo "🔧 Edite: /opt/rhcsa-mini-linux/data/vm_config.db"
