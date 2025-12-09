@@ -1,4 +1,0 @@
-El LV lv_logs está montado en /mnt/logs y empieza a quedarse sin espacio.
-El jefe indica:
-"Extiende lv_logs en 400M y redimensiona el filesystem en línea."
-

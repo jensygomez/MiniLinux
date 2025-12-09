@@ -1,4 +1,0 @@
-El sistema dispone de dos discos nuevos: /dev/loop2 y /dev/loop3.
-El jefe ordena:
-"Crea un Volume Group llamado vg_data usando ambos discos."
-

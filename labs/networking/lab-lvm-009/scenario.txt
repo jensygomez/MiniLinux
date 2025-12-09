@@ -1,4 +1,0 @@
-Una entrada incorrecta en /etc/fstab impide el montaje automático.
-El jefe ordena:
-"Corrige la entrada para que /mnt/cfg monte correctamente."
-

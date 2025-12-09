@@ -1,5 +1,0 @@
-ID=lab-lvm-011
-TITLE=Actualizar UUID en /etc/fstab
-MODULE=networking
-MODULE_NAME=Networking
-CREATED=2025-12-09_09:45:46

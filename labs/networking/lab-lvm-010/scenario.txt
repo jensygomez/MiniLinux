@@ -1,4 +1,0 @@
-El filesystem XFS existe en el LV lv_xdata, pero el VG vg_xfs tiene mucho espacio libre.
-El jefe solicita:
-"Extiende lv_xdata y luego ejecuta xfs_growfs."
-
