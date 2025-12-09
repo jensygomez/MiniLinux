@@ -22,7 +22,7 @@ while true; do
     echo
     case "${choice,,}" in
         t)
-            bash "./labs_menu.sh"
+            bash "$BIN/labs_menu.sh"
             ;;
         p)
             bash "$BIN/progress.sh"
