@@ -1,4 +1,0 @@
-Ya existe el Volume Group vg_apps con suficiente espacio disponible.
-El jefe pide:
-"Crea un Logical Volume llamado lv_home con tamaño 1G dentro del VG vg_apps."
-

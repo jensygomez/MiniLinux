@@ -1,4 +1,0 @@
-El servidor acaba de llegar del proveedor. El disco /dev/loop1 está totalmente limpio.
-El jefe solicita:
-"Convierte /dev/loop1 en un Physical Volume para preparar el almacenamiento."
-

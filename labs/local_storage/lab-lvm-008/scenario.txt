@@ -1,4 +1,0 @@
-El LV lv_full está completamente lleno.
-El jefe indica:
-"Extiende lv_full y luego el filesystem hasta recuperar espacio disponible."
-

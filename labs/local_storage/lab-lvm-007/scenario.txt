@@ -1,4 +1,0 @@
-El LV lv_home (EXT4) está desmontado y tiene espacio libre.
-El jefe solicita:
-"Reduce lv_home en 300M de forma segura."
-

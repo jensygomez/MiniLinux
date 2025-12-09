@@ -1,4 +1,0 @@
-El Volume Group vg_main está funcionando con un único disco (PV).
-El jefe ordena:
-"Agrega el disco /dev/loop11 al VG vg_main."
-

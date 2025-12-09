@@ -1,5 +1,0 @@
-ID=lab-lvm-001
-TITLE=Crear Physical Volume (PV)
-MODULE=local_storage
-MODULE_NAME=Local Storage
-CREATED=2025-12-09_09:47:40
