@@ -1,0 +1,5 @@
+Tienes dos discos idénticos y necesitas crear un LV de alto rendimiento
+para una base de datos crítica.
+El jefe ordena:
+"Crea un Logical Volume de 1.5G en modo striped (-i2) sobre ambos discos y formatealo con XFS."
+

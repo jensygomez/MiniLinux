@@ -1,0 +1,5 @@
+Uno de los discos del VG vg_degradado ha fallado (/dev/loop15 desapareció).
+El sistema reporta el VG como degradado.
+El jefe ordena:
+"Repara el VG eliminando el PV faltante y deja el sistema funcional con el disco restante."
+

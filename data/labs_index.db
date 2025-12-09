@@ -1,0 +1,16 @@
+lab-lvm-001|networking|Crear Physical Volume (PV)|2025-12-09
+lab-lvm-002|networking|Crear Volume Group (VG) con 2 discos|2025-12-09
+lab-lvm-003|networking|Crear Logical Volume (LV)|2025-12-09
+lab-lvm-004|networking|Crear filesystem y montar un LV|2025-12-09
+lab-lvm-005|networking|Extender Logical Volume en caliente|2025-12-09
+lab-lvm-006|networking|Agregar Physical Volume a un VG|2025-12-09
+lab-lvm-007|networking|Reducir Logical Volume (EXT4)|2025-12-09
+lab-lvm-008|networking|Extender LV lleno|2025-12-09
+lab-lvm-009|networking|Corregir entrada incorrecta en /etc/fstab|2025-12-09
+lab-lvm-010|networking|Extender filesystem XFS|2025-12-09
+lab-lvm-011|networking|Actualizar UUID en /etc/fstab|2025-12-09
+lab-lvm-012|networking|LVM Avanzado – Migración de datos con pvmove|2025-12-09
+lab-lvm-013|networking|LVM Avanzado – Remover un PV de un Volume Group|2025-12-09
+lab-lvm-014|networking|LVM Avanzado – Reparación de un VG degradado|2025-12-09
+lab-lvm-015|networking|LVM Avanzado – Conversión de partición estándar a LVM|2025-12-09
+lab-lvm-016|networking|LVM Avanzado – LV dividido en varias particiones (striped LV)|2025-12-09
