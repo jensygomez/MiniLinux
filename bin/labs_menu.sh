@@ -4,7 +4,6 @@ BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA="$BASE/data"
 LABS="$BASE/labs"
 
-# CARGAR LABS DESDE DB REAL
 load_labs() {
     mapfile -t labs < <(grep -v '^#' "$DATA/labs_index.db" | cut -d'|' -f1)
 }
@@ -26,8 +25,8 @@ show_labs_paginated() {
     done
     
     echo
-    echo "[b] Volver  [n] Siguiente  [p] Anterior  [s] Buscar"
-    echo "[ENTER] Seleccionar lab número →"
+    echo "[a] ➕ Adicionar  [b] Volver  [n] Siguiente  [p] Anterior  [s] Buscar"
+    echo "→ Seleccionar lab número →"
 }
 
 search_lab() {
@@ -80,8 +79,12 @@ run_lab() {
     
     echo "🔍 VALIDANDO..."
     if [[ -f "$LABS/$lab_id/validate.sh" ]]; then
-        sshpass -p "$VM_PASS" ssh -o StrictHostKeyChecking=no "$VM_USER@$VM_IP" "bash -s" < "$LABS/$lab_id/validate.sh" 2>/dev/null || \
-        echo "✅ Simulación: Lab completado (20 PTS)"
+        if command -v sshpass >/dev/null; then
+            sshpass -p "$VM_PASS" ssh -o StrictHostKeyChecking=no "$VM_USER@$VM_IP" "bash -s" < "$LABS/$lab_id/validate.sh" 2>/dev/null || \
+            echo "✅ Simulación: Lab completado (20 PTS)"
+        else
+            echo "✅ Simulación: Lab completado (20 PTS)"
+        fi
     else
         echo "✅ Simulación: Lab completado (20 PTS)"
     fi
@@ -89,15 +92,11 @@ run_lab() {
     read -r -p "ENTER para menú..."
 }
 
-# CARGAR LABS
-load_labs
-
 add_new_labs() {
     clear
     echo "➕ ADICIONAR NUEVOS LABORATORIOS"
     echo "================================"
     
-    # Módulos RHCSA
     declare -A modules=(
         ["1"]="Essential Tools"
         ["2"]="Running Systems" 
@@ -163,7 +162,7 @@ add_new_labs() {
     echo
     echo "📝 Editando: $LAB_PATH-master.lab"
     echo "Pega tu formato LVM labs → Ctrl+O → Enter → Ctrl+X"
-    echo
+    sleep 2
     nano "$LABS/$LAB_PATH-master.lab"
     
     echo "📥 IMPORTANDO $LAB_PATH-master.lab..."
@@ -176,76 +175,68 @@ add_new_labs() {
 
 parse_lab_file() {
     local file="$1" module="$2"
-    local lab_count=0
-    
-    # Crear directorio del módulo
     local lab_dir="$LABS/${module//./_}"
     mkdir -p "$lab_dir"
     
-    awk '
-    BEGIN { lab_id=""; in_lab=false; in_setup=false; in_scenario=false; in_validations=false; }
+    awk -v lab_dir="$lab_dir" -v db_file="$DATA/labs_index.db" -v module="$module" '
+    BEGIN { 
+        lab_id=""; lab_num=""; title=""; diff=""; pts=""; 
+        in_lab=0; in_scenario=0; in_setup=0; in_validations=0;
+    }
     
-    # Detectar nuevo LAB
+    # Nuevo LAB
     /^[ \t]*\[LAB_[0-9]+\]/ {
         if (in_lab && lab_id != "") {
-            # Guardar archivos previos
             close(scenario_file);
             close(validate_file);
+            print lab_id "|" lab_dir "/" lab_id "|" title "|" diff "|" pts "|🔴 Nuevo" >> db_file;
         }
-        in_lab=true;
+        in_lab=1;
         gsub(/[\[\]]/, "", $0);
         lab_num = substr($0, 6);
         lab_id = "lab-" module "-" sprintf("%03d", lab_num);
         next;
     }
     
-    # LAB metadata
-    /^[ \t]*ID[ \t]*=/ { id=substr($0, index($0,$3)); gsub(/"/, "", id); }
-    /^[ \t]*TITLE[ \t]*=/ { title=substr($0, index($0,$3)); gsub(/"/, "", title); }
+    # Metadata
+    /^[ \t]*TITLE[ \t]*=/ { 
+        gsub(/"/, "", $0); sub(/.*=/, "", $0); title=$0; 
+    }
     /^[ \t]*DIFICULTAD[ \t]*=/ { diff=$3; }
     /^[ \t]*PUNTOS[ \t]*=/ { pts=$3; }
     
-    # SETUP
-    /^[ \t]*\[LAB_[0-9]+_SETUP\]/ { in_setup=true; next; }
-    
-    # SCENARIO  
+    # Secciones
     /^[ \t]*\[LAB_[0-9]+_SCENARIO\]/ { 
-        in_scenario=true; 
-        scenario_file=lab_dir "/" id "/scenario.txt";
-        print "=== LAB " id ": " title " ===" > scenario_file;
+        in_scenario=1; 
+        scenario_file=lab_dir "/" lab_id "/scenario.txt";
+        print "=== LAB " lab_id ": " title " ===" > scenario_file;
         next; 
     }
-    
-    # VALIDACIONES
     /^[ \t]*\[LAB_[0-9]+_VALIDACIONES\]/ { 
-        in_validations=true; 
-        validate_file=lab_dir "/" id "/validate.sh";
+        in_validations=1; 
+        validate_file=lab_dir "/" lab_id "/validate.sh";
         print "#!/bin/bash" > validate_file;
-        print "echo \"🔍 VALIDANDO " id "...\"" >> validate_file;
+        print "echo \"🔍 VALIDANDO " lab_id "...\"" >> validate_file;
         next;
     }
     
-    in_scenario { print > scenario_file; }
-    in_setup || in_validations { print > validate_file; }
+    in_scenario && NF>0 { print > scenario_file; }
+    (in_validations || in_setup) && NF>0 { print >> validate_file; }
     
     END {
         if (in_lab && lab_id != "") {
             close(scenario_file);
             close(validate_file);
-            print lab_id "|" lab_dir "/" id "|" title "|" diff "|" pts "|🔴 Nuevo" >> "'"$DATA/labs_index.db"'";
-            lab_count++;
+            print lab_id "|" lab_dir "/" lab_id "|" title "|" diff "|" pts "|🔴 Nuevo" >> db_file;
         }
     }' "$file"
     
-    # Permisos
-    find "$lab_dir" -name "*.sh" -exec chmod +x {} \;
-    echo "$lab_count labs creados en $lab_dir"
+    find "$lab_dir" -name "*.sh" -exec chmod +x {} \; 2>/dev/null
+    echo "✅ $(grep -c "^lab-" "$DATA/labs_index.db") labs creados!"
 }
 
-
-
-
-
+# CARGAR LABS
+load_labs
 
 page=1
 while true; do
@@ -254,6 +245,11 @@ while true; do
     read -r choice
     
     case "${choice,,}" in
+        a)
+            add_new_labs
+            load_labs
+            continue
+            ;;
         b)
             echo "👋 Volviendo al menú principal..."
             sleep 1
@@ -284,13 +280,9 @@ while true; do
                     sleep 1
                 fi
             else
-                echo "❌ Usa: b,n,p,s o número (ej: 5)"
+                echo "❌ Usa: a,b,n,p,s o número (ej: 5)"
                 sleep 1
             fi
             ;;
-        a)
-            add_new_labs
-            ;;
-
     esac
 done
