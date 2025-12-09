@@ -1,3 +1,4 @@
+# bin/menu_labs.sh
 #!/usr/bin/env bash
 
 BASE_DIR="$HOME/MiniLinux"
@@ -12,9 +13,13 @@ while true; do
 
     # Mostrar primeros 20 labs
     if [ -f "$DB" ]; then
-        echo "ID | Módulo | Nombre"
-        echo "--------------------------------"
-        head -n 20 "$DB"
+        printf "%-5s %-10s %-40s\n" "ID" "Módulo" "Nombre"
+        printf "%-5s %-10s %-40s\n" "-----" "----------" "----------------------------------------"
+
+        while IFS="|" read -r id modulo nombre _; do
+            printf "%-5s %-10s %-40s\n" "$id" "$modulo" "$nombre"
+        done < <(head -n 20 "$DB")
+
     else
         echo "(sin laboratorios registrados)"
     fi

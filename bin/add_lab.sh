@@ -115,3 +115,19 @@ done
 
 echo "Proceso finalizado."
 echo "Los laboratorios fueron instalados correctamente."
+
+
+source "$HOME/MiniLinux/bin/menu_modulos.sh"
+
+adicionar_lab() {
+
+    # Llamar al menú de módulos
+    if ! select_modulo; then
+        echo "Operación cancelada."
+        return
+    fi
+
+    echo "Has seleccionado:"
+    echo "  Módulo ID: $MODULO_ID"
+    echo "  Nombre:    $MODULO_NOMBRE"
+
