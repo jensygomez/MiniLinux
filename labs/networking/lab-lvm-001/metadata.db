@@ -1,0 +1,5 @@
+ID=lab-lvm-001
+TITLE=Crear Physical Volume (PV)
+MODULE=networking
+MODULE_NAME=Networking
+CREATED=2025-12-09_09:35:31
