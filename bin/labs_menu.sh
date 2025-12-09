@@ -1,23 +1,51 @@
 #!/usr/bin/env bash
 
 BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LABS="$BASE/labs"
 DATA="$BASE/data"
+LABS="$BASE/labs"
 
-show_labs() {
+# CARGAR LABS DESDE DB REAL
+load_labs() {
+    mapfile -t labs < <(grep -v '^#' "$DATA/labs_index.db" | cut -d'|' -f1)
+}
+
+show_labs_paginated() {
+    local page=${1:-1} per_page=10
+    local total=${#labs[@]} start=$(( (page-1)*per_page )) end=$(( start+per_page ))
+    
     clear
-    echo "🔬 LABORATORIOS DISPONIBLES"
-    echo "=========================="
-    echo "ID     | Titulo                 | Dif | Pts | Status"
-    echo "--------------------------------------------------"
-    echo " lvm-001  | PV básico             | 1  | 20  | 🔴 Nuevo"
-    echo " lvm-002  | VG básico             | 2  | 30  | 🔴 Nuevo"
-    echo " users-001| Crear usuario         | 1  | 15  | 🔴 Nuevo"
-    echo " network-001| Config IP         | 2  | 25  | 🔴 Nuevo"
+    echo "🔬 LABORATORIOS ($total total) - Página $page"
+    echo "========================================"
+    echo "ID      | Título                  | Pts | Status"
+    echo "------------------------------------------------"
+    
+    for i in $(seq $start $((end-1 < ${#labs[@]} ? end-1 : ${#labs[@]}-1 ))); do
+        id="${labs[$i]}"
+        echo " [$((i+1))] $id"
+    done
+    
     echo
-    echo "[1] LVM-001  [2] LVM-002  [3] Users  [4] Network"
-    echo "[b] Volver al menú principal"
-    echo
+    echo "[b] Volver  [n] Siguiente  [p] Anterior  [s] Buscar"
+    echo "[ENTER] Seleccionar lab número →"
+}
+
+search_lab() {
+    echo "🔍 Buscar lab (ej: lvm, user):"
+    read -r query
+    mapfile -t results < <(grep -i "$query" "$DATA/labs_index.db" | cut -d'|' -f1)
+    
+    if [[ ${#results[@]} -eq 0 ]]; then
+        echo "❌ No encontrado"
+        sleep 1
+        return
+    fi
+    
+    echo "Resultados:"
+    for i in "${!results[@]}"; do
+        echo " [$((i+1))] ${results[$i]}"
+    done
+    read -p "Seleccionar (1-${#results[@]}): " num
+    run_lab "${results[$((num-1))]}"
 }
 
 run_lab() {
@@ -25,53 +53,46 @@ run_lab() {
     source "$DATA/vm_config.db"
     
     clear
-    echo "🚀 INICIANDO LAB: $lab_id"
-    echo "========================"
+    echo "🚀 LAB: $lab_id"
     echo "VM: $VM_USER@$VM_IP"
-    echo
-    echo "🔧 Preparando VM para $lab_id..."
-    echo "💻 Conéctate: ssh $VM_USER@$VM_IP"
-    echo
+    
     echo "📖 ESCENARIO:"
-    cat "$LABS/$lab_id/scenario.txt" 2>/dev/null || echo "Archivo de escenario no encontrado"
+    cat "$LABS/$lab_id/scenario.txt" 2>/dev/null || echo "Escenario faltante"
     echo
-    echo "⏳ Haz los comandos y presiona ENTER para validar..."
-    read
-    echo
+    echo "💻 ssh $VM_USER@$VM_IP"
+    read -p "ENTER para validar..."
+    
     echo "🔍 VALIDANDO..."
-    echo "✅ Simulación: Laboratorio completado (20 PTS)"
-    echo "🎉 ¡ÉXITO!"
-    sleep 2
-    echo
-    read -p "ENTER para volver al menú de labs..."
+    if [[ -f "$LABS/$lab_id/validate.sh ]]; then
+        sshpass -p "$VM_PASS" ssh -o StrictHostKeyChecking=no "$VM_USER@$VM_IP" "bash -s" < "$LABS/$lab_id/validate.sh" 2>/dev/null
+    fi
+    read -p "ENTER para menú..."
 }
 
+# CARGAR LABS
+load_labs
+
+page=1
 while true; do
-    show_labs
-    read -p "Opción (1-4,b): " -n1 choice
-    echo
+    show_labs_paginated $page
+    
+    read -r -p "→ " choice
     
     case "${choice,,}" in
-        1)
-            run_lab "lvm-001"
+        b) exit 0 ;;
+        n) ((page++)); continue ;;
+        p) ((page>1)) && ((page--)); continue ;;
+        s) search_lab; continue ;;
+        [0-9]*)
+            num=$((choice-1))
+            if [[ $num -ge 0 && $num -lt ${#labs[@]} ]]; then
+                run_lab "${labs[$num]}"
+            else
+                echo "❌ Número inválido"
+                sleep 1
+            fi
             ;;
-        2)
-            run_lab "lvm-002"
-            ;;
-        3)
-            run_lab "users-001"
-            ;;
-        4)
-            run_lab "network-001"
-            ;;
-        b)
-            echo "👋 Volviendo al menú principal..."
-            sleep 1
-            exit 0
-            ;;
-        *)
-            echo "❌ Opción inválida. Usa: 1-4 o b"
-            sleep 1
-            ;;
+        "") continue ;;
+        *) echo "❌ Usa: b,n,p,s o número"; sleep 1 ;;
     esac
 done
