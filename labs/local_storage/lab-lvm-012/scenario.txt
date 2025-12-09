@@ -1,0 +1,5 @@
+Tienes un VG con dos PVs y un LV con datos importantes.
+El disco /dev/loop10 necesita ser reemplazado por mantenimiento.
+El jefe ordena:
+"Migra todos los datos de /dev/loop10 a /dev/loop11 usando pvmove sin downtime."
+

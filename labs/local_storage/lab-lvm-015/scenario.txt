@@ -1,0 +1,5 @@
+Tienes un disco con una partición EXT4 tradicional que contiene datos importantes.
+Necesitas migrar a LVM para tener más flexibilidad.
+El jefe indica:
+"Convierte /dev/loop16p1 a LVM sin perder datos, creando un nuevo punto de montaje /mnt/nuevo_legacy."
+

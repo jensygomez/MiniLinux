@@ -1,0 +1,5 @@
+El VG vg_remocao tiene dos PVs, pero necesitas retirar /dev/loop13
+para usarlo en otro proyecto.
+El jefe indica:
+"Remueve /dev/loop13 del VG usando vgreduce, asegurando que el LV siga funcionando."
+

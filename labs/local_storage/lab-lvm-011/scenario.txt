@@ -1,0 +1,5 @@
+El filesystem del LV lv_uuid fue recreado y ahora tiene un UUID diferente,
+pero /etc/fstab aún contiene el UUID anterior.
+El jefe indica:
+"Actualiza el UUID en fstab sin desmontar el filesystem."
+

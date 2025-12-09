@@ -1,0 +1,4 @@
+El LV lv_data existe dentro del VG vg_storage, pero aún no tiene filesystem.
+El jefe ordena:
+"Crea un filesystem ext4 y móntalo permanentemente en /mnt/data."
+
