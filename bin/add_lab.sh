@@ -1,80 +1,117 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-BASE_DIR="$HOME/MiniLinux"
-DB="$BASE_DIR/data/labs_index.db"
-
-declare -A MODULE_MAP=(
-    ["1"]="module01_basics"
-    ["2"]="module02_users"
-    ["3"]="module03_storage"
-    ["4"]="module04_networking"
-    ["5"]="module05_systemctl"
-    ["6"]="module06_security"
-)
+BASE_DIR="$(dirname "$(realpath "$0")")/.."
+LABS_DIR="$BASE_DIR/labs"
+DATA_DIR="$BASE_DIR/data"
+TMP_FILE="/tmp/new_lab_$$.lab"
 
 clear
 echo "==============================================="
-echo "        ADICIONAR NUEVO LABORATORIO"
+echo "     RHCSA MINI LINUX — ADICIONAR LAB"
 echo "==============================================="
 echo
-echo "Seleccione el módulo:"
-echo "1) Basics"
-echo "2) Usuarios"
-echo "3) Storage"
-echo "4) Networking"
-echo "5) Systemctl / Services"
-echo "6) Seguridad"
+echo "Seleccione el módulo donde se almacenará:"
+echo
+echo "1) Local Storage"
+echo "2) User & Groups"
+echo "3) Networking"
+echo "4) Firewalld & SELinux"
+echo "5) Containers"
+echo "6) Scripting"
+echo
+read -p "Opción: " MOD
+
+case "$MOD" in
+    1) MODULE="local_storage" ;;
+    2) MODULE="users_groups" ;;
+    3) MODULE="networking" ;;
+    4) MODULE="security" ;;
+    5) MODULE="containers" ;;
+    6) MODULE="scripting" ;;
+    *) echo "Opción inválida"; exit 1 ;;
+esac
+
+echo
+echo "Se abrirá NANO. Pegue su contenido completo del laboratorio."
+echo "Al guardar, se procesará automáticamente."
+echo
+read -p "Presione ENTER para continuar..."
+
+nano "$TMP_FILE"
+echo
+echo "Procesando laboratorio..."
 echo
 
-read -p "Opción: " mod
-
-TARGET_MODULE="${MODULE_MAP[$mod]}"
-
-if [ -z "$TARGET_MODULE" ]; then
-    echo "Módulo inválido."
-    sleep 1
+if [ ! -s "$TMP_FILE" ]; then
+    echo "Nada fue ingresado. Cancelando."
     exit 1
 fi
 
-MODULE_DIR="$BASE_DIR/labs/$TARGET_MODULE"
+# ---------------------------------------------------------
+# DETECTAR BLOQUES DE LABORATORIOS
+# ---------------------------------------------------------
+LAB_IDS=$(grep -oP "^\[LAB_\K[0-9]{3}(?=\])" "$TMP_FILE")
 
-mkdir -p "$MODULE_DIR"
-
-TMP="/tmp/newlab.txt"
-
-# Crear template vacío
-cat > "$TMP" <<EOF
-# Pegue aquí su laboratorio en formato libre.
-# Ejemplo:
-# ID: lab-001
-# Title: Configurar LVM básico
-# Scenario: ...
-# Setup: ...
-# Validations: ...
-EOF
-
-nano "$TMP"
-
-# PARSING SIMPLE
-LAB_ID=$(grep -i "^ID:" "$TMP" | awk '{print $2}')
-LAB_TITLE=$(grep -i "^Title:" "$TMP" | cut -d':' -f2- | sed 's/^ *//')
-
-if [ -z "$LAB_ID" ]; then
-    echo "ERROR: No se encontró el ID del laboratorio."
-    sleep 2
+if [ -z "$LAB_IDS" ]; then
+    echo "No se detectaron LAB_XXX. Archivo inválido."
     exit 1
 fi
 
-FINAL_PATH="$MODULE_DIR/$LAB_ID.lab"
-
-cp "$TMP" "$FINAL_PATH"
-
-echo "$LAB_ID | $TARGET_MODULE | $LAB_TITLE" >> "$DB"
-
+echo "Se detectaron los siguientes LABS:"
+echo "$LAB_IDS"
 echo
-echo "Laboratorio agregado:"
-echo " - ID: $LAB_ID"
-echo " - Modulo: $TARGET_MODULE"
-echo " - Archivo: $FINAL_PATH"
-echo
-sleep 2
+
+# ---------------------------------------------------------
+# PROCESAR LAB POR LAB
+# ---------------------------------------------------------
+for LAB_NUM in $LAB_IDS; do
+
+    LAB_TAG="LAB_${LAB_NUM}"
+
+    ID=$(awk -F'=' "/\[$LAB_TAG\]/,/^\[/{ if(\$1 ~ /ID/) print \$2 }" "$TMP_FILE" | tr -d ' ')
+    TITLE=$(awk -F'=' "/\[$LAB_TAG\]/,/^\[/{ if(\$1 ~ /TITLE/) print \$2 }" "$TMP_FILE" | sed 's/^ //')
+    SUBTITLE=$(awk -F'=' "/\[$LAB_TAG\]/,/^\[/{ if(\$1 ~ /SUBTITLE/) print \$2 }" "$TMP_FILE" | sed 's/^ //')
+
+    LAB_DIR="$LABS_DIR/$ID"
+    mkdir -p "$LAB_DIR"
+
+    # -------------------------------
+    # METADATA
+    # -------------------------------
+    {
+        echo "ID=$ID"
+        echo "TITLE=$TITLE"
+        echo "SUBTITLE=$SUBTITLE"
+        echo "MODULE=$MODULE"
+        echo "NUM=$LAB_NUM"
+    } > "$LAB_DIR/metadata.db"
+
+    # -------------------------------
+    # SCENARIO
+    # -------------------------------
+    awk "/\[$LAB_TAG\_SCENARIO\]/,/^\[/" "$TMP_FILE" | sed '1d;$d' > "$LAB_DIR/scenario.txt"
+
+    # -------------------------------
+    # SETUP
+    # -------------------------------
+    awk "/\[$LAB_TAG\_SETUP\]/,/^\[/" "$TMP_FILE" | sed '1d;$d' > "$LAB_DIR/setup.sh"
+    chmod +x "$LAB_DIR/setup.sh"
+
+    # -------------------------------
+    # VALIDACIONES
+    # -------------------------------
+    awk "/\[$LAB_TAG\_VALIDACIONES\]/,/^\[/" "$TMP_FILE" | sed '1d;$d' > "$LAB_DIR/validations.sh"
+    chmod +x "$LAB_DIR/validations.sh"
+
+    # -------------------------------
+    # Registrar en base de datos
+    # -------------------------------
+    echo "$ID|$MODULE|$TITLE" >> "$DATA_DIR/labs_index.db"
+
+    echo "LAB $ID creado."
+    echo
+
+done
+
+echo "Proceso finalizado."
+echo "Los laboratorios fueron instalados correctamente."
