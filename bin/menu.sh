@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-source "$(pwd)/bin/utils.sh"
+
+BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="$BASE/bin"
 
 show_main() {
     clear
@@ -7,7 +9,7 @@ show_main() {
     echo "      🚀 RHCSA MINI LINUX — MENÚ PRINCIPAL"
     echo "==============================================="
     echo "[t] Treinamento (Labs + VM)"
-    echo "[p] Progreso" 
+    echo "[p] Progreso"
     echo "[c] Configuraciones"
     echo "[s] Salir"
     echo
@@ -15,11 +17,25 @@ show_main() {
 
 while true; do
     show_main
-    choice=$(get_valid_input "tpcs" "Escoge (t,p,c,s): ")
+    # leemos 1 carácter
+    read -p "Escoge (t,p,c,s): " -n1 choice
+    echo
     case "${choice,,}" in
-        t) bash "$(pwd)/bin/labs_menu.sh" ;;
-        p) bash "$(pwd)/bin/progress.sh" ;;
-        c) bash "$(pwd)/bin/config.sh" ;;
-        s) exit 0 ;;
+        t)
+            bash "$BIN/labs_menu.sh"
+            ;;
+        p)
+            bash "$BIN/progress.sh"
+            ;;
+        c)
+            bash "$BIN/config.sh"
+            ;;
+        s)
+            exit 0
+            ;;
+        *)
+            echo "❌ Opción inválida. Usa: t, p, c o s"
+            sleep 1
+            ;;
     esac
 done
