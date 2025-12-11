@@ -59,7 +59,7 @@ generate_vars() {
     USUARIO=$(rand_from_list "${USUARIOS[@]}")
     FILESYSTEM=$(rand_from_list "${FILESYSTEMS[@]}")
     MOUNT_POINT=$(rand_from_list "${MOUNT_POINTS[@]}")
-    DISK_SIZE_MB=$(rand_from_list "${DISK_SIZES[@]}")
+    DISK_SIZE_MB=$(rand_from_list "${DISK_SIZES_MB[@]}")  # ← CORREGIDO
     
     success "Variables generadas para esta sesión:"
     log "  🆔 ID: ${ID}"
@@ -132,6 +132,9 @@ setup_vm_automatico() {
         # Actualizar tabla de particiones
         sudo partprobe \$LOOP_DEV 2>/dev/null || true
         
+        # Esperar a que el kernel reconozca la partición
+        sleep 2
+        
         # Crear archivo de variables
         cat > /tmp/lab_vars_${ID}.txt << EOF
 # ============ LABORATORIO ${ID} ============
@@ -151,17 +154,18 @@ EOF
 COMANDOS PARA EL LABORATORIO:
 1. Verificar disco: sudo fdisk -l /tmp/simulated_sdb
 2. Ver partición: sudo lsblk /tmp/simulated_sdb
-3. Formatear: sudo mkfs.$FILESYSTEM_OBJETIVO /tmp/simulated_sdb1
-4. Crear directorio: sudo mkdir -p $MOUNT_POINT
-5. Montar: sudo mount /tmp/simulated_sdb1 $MOUNT_POINT
+3. Formatear: sudo mkfs.\$FILESYSTEM_OBJETIVO /tmp/simulated_sdb1
+4. Crear directorio: sudo mkdir -p \$MOUNT_POINT
+5. Montar: sudo mount /tmp/simulated_sdb1 \$MOUNT_POINT
 6. Hacer permanente: 
    UUID=\$(sudo blkid -s UUID -o value /tmp/simulated_sdb1)
-   echo "UUID=\$UUID $MOUNT_POINT $FILESYSTEM_OBJETIVO defaults 0 0" | sudo tee -a /etc/fstab
-7. Verificar: sudo mount -a && df -h $MOUNT_POINT
+   echo "UUID=\$UUID \$MOUNT_POINT \$FILESYSTEM_OBJETIVO defaults 0 0" | sudo tee -a /etc/fstab
+7. Verificar: sudo mount -a && df -h \$MOUNT_POINT
 INSTR
         
         echo 'SUCCESS:setup_completado'
         echo \"LOOP_DEVICE:\$LOOP_DEV\"
+        echo \"PARTICION:\${LOOP_DEV}p1\"
     " 2>&1)
     
     # Verificar resultado
@@ -171,8 +175,10 @@ INSTR
         
         # Mostrar info del setup
         local loop_device=$(echo "$setup_result" | grep "LOOP_DEVICE:" | cut -d: -f2)
+        local particion=$(echo "$setup_result" | grep "PARTICION:" | cut -d: -f2)
         log "  Disco creado: /tmp/${disk_name} (${DISK_SIZE_MB}MB)"
         log "  Loop device: $loop_device"
+        log "  Partición: $particion"
         log "  Acceso simulado: /tmp/simulated_sdb"
         log "  Variables en: /tmp/lab_vars_${ID}.txt"
     else
