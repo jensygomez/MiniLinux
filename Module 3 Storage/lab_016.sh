@@ -95,6 +95,23 @@ ensure_sshpass_local() {
   fi
 }
 
+ensure_bc_local() {
+  if ! command -v bc &>/dev/null; then
+    log "[*] bc no encontrado en VM1 — intentando instalar..."
+    if command -v apt-get &>/dev/null; then
+      apt-get update -y && apt-get install -y bc || true
+    elif command -v dnf &>/dev/null; then
+      dnf install -y bc || true
+    elif command -v yum &>/dev/null; then
+      yum install -y bc || true
+    fi
+    if ! command -v bc &>/dev/null; then
+      echo "ERROR: bc no pudo instalarse. Instálalo manualmente en VM1."
+      exit 1
+    fi
+  fi
+}
+
 # =============== GENERAR VARIABLES ALEATORIAS (UNA VEZ) ===============
 generate_vars() {
   # Declarar todas las variables como globales
@@ -174,31 +191,33 @@ mostrar_ticket() {
     
     # Estado actual del sistema (usando variables generadas)
     echo -e "${BLUE}💻 ESTADO ACTUAL DE VM2 (${VM2_IP}):${NC}"
-    echo -e "${CYAN}✅ Volume Group '${VG_NAME}' YA EXISTE (${TOTAL_GB}GB)${NC}"
-    echo "   - Usa los discos REMOTE: /dev/loop0 (${DISK1_GB}GB) y /dev/loop1 (${DISK2_GB}GB)"
+    echo -e "${CYAN}✅ Discos disponibles: /dev/loop0 (${DISK1_GB}GB) y /dev/loop1 (${DISK2_GB}GB)${NC}"
+    echo -e "${RED}❌ Volume Group '${VG_NAME}' NO EXISTE aún${NC}"
     echo -e "${RED}❌ Logical Volume '${LV_NAME}' NO EXISTE aún${NC}"
     echo ""
     
     echo -e "${GREEN}💻 TAREAS PENDIENTES:${NC}"
-    echo "1. Crear Logical Volume: ${LV_NAME} de tamaño ~ ${LV_SIZE} (${LV_SIZE_GB}GB)"
-    echo "   - Usar espacio disponible en ${VG_NAME} (${TOTAL_GB}GB total)"
-    echo "2. Configurar LV en modo STRIPED (-i2) para usar ambos discos"
-    echo "3. Formatear con XFS"
-    echo "4. Montar en /var/lib/pgsql/data con opciones noatime,nodiratime"
-    echo "5. Agregar montaje permanente a /etc/fstab"
+    echo "1. Crear Physical Volumes en /dev/loop0 y /dev/loop1"
+    echo "2. Crear Volume Group: ${VG_NAME} usando ambos PVs (${TOTAL_GB}GB total)"
+    echo "3. Crear Logical Volume: ${LV_NAME} de tamaño ~ ${LV_SIZE} (${LV_SIZE_GB}GB)"
+    echo "   - Configurar en modo STRIPED (-i2) para usar ambos discos"
+    echo "4. Formatear con XFS"
+    echo "5. Montar en /var/lib/pgsql/data con opciones noatime,nodiratime"
+    echo "6. Agregar montaje permanente a /etc/fstab"
     echo ""
     
     echo -e "${RED}⚠️ RIESGOS:${NC}"
     echo "- Si no está striped: rendimiento no mejorará"
     echo "- Si no es XFS: riesgo de pérdida de datos"
-    echo "- Espacio limitado: ${TOTAL_GB}GB disponible en ${VG_NAME}"
+    echo "- Espacio limitado: ${TOTAL_GB}GB disponible en total"
     echo "- Tiempo crítico: 90 minutos para solución"
     echo ""
     
     echo -e "${GREEN}✅ CRITERIOS DE ACEPTACIÓN:${NC}"
+    echo "- 'sudo pvs' muestra 2 PVs (/dev/loop0 y /dev/loop1) en ${VG_NAME}"
+    echo "- 'sudo vgs' confirma ${VG_NAME} con ~${TOTAL_GB}GB y espacio reducido tras crear el LV"
     echo "- 'sudo lvs' muestra ${LV_NAME} con segtype 'striped' y 2 stripes"
-    echo "- 'df -h' muestra montado en /var/lib/pgsql/data con XFS"
-    echo "- 'sudo vgs' confirma ${VG_NAME} con espacio reducido tras crear el LV"
+    echo "- 'df -T' muestra montado en /var/lib/pgsql/data con XFS"
     echo "- '/etc/fstab' contiene entrada permanente para el montaje"
     echo ""
     
@@ -256,7 +275,7 @@ fi
 # Si el VG ya existe: avisar y salir (no modificamos trabajo del alumno)
 if echo "$PASS" | sudo -S vgs --noheadings -o vg_name 2>/dev/null | grep -qw "$VG"; then
   echo "[REMOTE] ⚠️ Volume Group '$VG' ya existe en el host remoto."
-  echo "[REMOTE] ⚠️ NO se modificarán PVs/VG para preservar trabajo existente."
+  echo "[REMOTE] ⚠️ NO se modificarán discos para preservar trabajo existente."
   echo "=== CURRENT VGS ==="
   echo "$PASS" | sudo -S vgs || true
   echo "=== CURRENT PVS ==="
@@ -273,13 +292,7 @@ echo "[REMOTE] Limpiando firmas previas en loops..."
 echo "$PASS" | sudo -S wipefs -a "$LOOP1" || true
 echo "$PASS" | sudo -S wipefs -a "$LOOP2" || true
 
-echo "[REMOTE] Creando Physical Volumes..."
-echo "$PASS" | sudo -S pvcreate -y "$LOOP1" "$LOOP2"
-
-echo "[REMOTE] Creando Volume Group '$VG' (con 2 PVs)..."
-echo "$PASS" | sudo -S vgcreate "$VG" "$LOOP1" "$LOOP2"
-
-echo "[REMOTE] ✅ Configuración base completada"
+echo "[REMOTE] ✅ Configuración base completada (discos listos para PV/VG)"
 echo "=== VALIDATOR OUTPUT BEGIN ==="
 echo "PV_LIST:"
 echo "$PASS" | sudo -S pvs --noheadings -o pv_name,vg_name,size 2>/dev/null || true
@@ -382,7 +395,30 @@ remote_validator() {
   errors=()
   successes=()
 
-  # 1) Verificar LV existe
+  # 1) Verificar PVs
+  PV_INFO=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
+    "echo '${VM2_PASS}' | sudo -S pvs --noheadings -o pv_name,vg_name 2>/dev/null | grep '${VG_NAME}' || true")
+  
+  PV1=$(echo "$PV_INFO" | grep -c '/dev/loop0' || true)
+  PV2=$(echo "$PV_INFO" | grep -c '/dev/loop1' || true)
+  
+  if [ "$PV1" -ge 1 ] && [ "$PV2" -ge 1 ]; then
+    successes+=("✅ 2 PVs (/dev/loop0 y /dev/loop1) en VG '${VG_NAME}'")
+  else
+    errors+=("❌ PVs incompletos en '${VG_NAME}' (esperados: /dev/loop0 y /dev/loop1)")
+  fi
+
+  # 2) Verificar VG existe
+  VG_EXIST=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
+    "echo '${VM2_PASS}' | sudo -S vgs --noheadings -o vg_name 2>/dev/null | grep -w '${VG_NAME}' || true")
+  
+  if [ -n "$VG_EXIST" ]; then
+    successes+=("✅ VG '${VG_NAME}' existe")
+  else
+    errors+=("❌ VG '${VG_NAME}' NO existe")
+  fi
+
+  # 3) Verificar LV existe
   LV_EXIST=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
     "echo '${VM2_PASS}' | sudo -S lvs --noheadings -o lv_name ${VG_NAME} 2>/dev/null | grep -w '${LV_NAME}' || true")
   
@@ -392,7 +428,7 @@ remote_validator() {
     errors+=("❌ LV '${LV_NAME}' NO existe en VG '${VG_NAME}'")
   fi
 
-  # 2) Obtener segtype y stripes
+  # 4) Obtener segtype y stripes
   LV_INFO=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
     "echo '${VM2_PASS}' | sudo -S lvs --noheadings -o segtype,stripes ${VG_NAME}/${LV_NAME} 2>/dev/null || true")
   
@@ -415,7 +451,7 @@ remote_validator() {
     errors+=("❌ No se pudo obtener segtype/stripes")
   fi
 
-  # 3) Filesystem type
+  # 5) Filesystem type
   BLKID_OUT=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
     "echo '${VM2_PASS}' | sudo -S blkid /dev/${VG_NAME}/${LV_NAME} 2>/dev/null || true")
   
@@ -425,7 +461,7 @@ remote_validator() {
     errors+=("❌ Filesystem NO es XFS")
   fi
 
-  # 4) Mount point
+  # 6) Mount point
   MOUNT_OUT=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
     "mount 2>/dev/null | grep '/var/lib/pgsql/data' || true")
   
@@ -439,7 +475,7 @@ remote_validator() {
     errors+=("❌ NO está montado en /var/lib/pgsql/data")
   fi
 
-  # 5) fstab
+  # 7) fstab
   FSTAB_OUT=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
     "grep -F '/dev/${VG_NAME}/${LV_NAME}' /etc/fstab 2>/dev/null || true")
   
@@ -481,6 +517,7 @@ remote_validator() {
 main() {
   require_root
   ensure_sshpass_local
+  ensure_bc_local
   
   log "🚀 Iniciando generación de entorno de prácticas..."
   log "================================================"
@@ -514,6 +551,8 @@ main() {
   echo ""
   echo -e "${CYAN}Ejemplo de comandos en VM2 (student@${VM2_IP}):${NC}"
   echo "  ssh student@${VM2_IP}"
+  echo "  sudo pvcreate /dev/loop0 /dev/loop1"
+  echo "  sudo vgcreate ${VG_NAME} /dev/loop0 /dev/loop1"
   echo "  sudo lvcreate -n ${LV_NAME} -L ${LV_SIZE} -i 2 ${VG_NAME}"
   echo "  sudo mkfs.xfs -f /dev/${VG_NAME}/${LV_NAME}"
   echo "  sudo mkdir -p /var/lib/pgsql/data"
@@ -537,4 +576,3 @@ main() {
 }
 
 main "$@"
- 
