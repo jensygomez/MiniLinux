@@ -14,9 +14,6 @@ REMOTE_DISKS_DIR="/home/${VM2_USER}/disks"
 REMOTE_WORKDIR_BASE="/tmp/lab_remote"
 SAVE_JSON_DIR="/root"
 
-CLEAN_LOCAL=true     # --no-clean para preservar las imágenes
-DEBUG=0
-
 
 # =============== ARRAYS PARA VARIABLES ALEATORIAS ===============
 # Listas de nombres
