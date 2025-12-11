@@ -5,18 +5,12 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# =============== CONFIGURACIÓN ===============
-VM2_IP="192.168.122.110"
-VM2_USER="student"
-VM2_PASS="redhat"
 
-LOCAL_DISKS_DIR="/root/disks"
-REMOTE_DISKS_DIR="/home/${VM2_USER}/disks"
-REMOTE_WORKDIR_BASE="/tmp/lab_remote"
-SAVE_JSON_DIR="/root"
+# =============== CARGAR CONFIGURACIÓN ===============
+source ./config.sh
+source ./utils.sh
+source ./generators.sh
 
-CLEAN_LOCAL=true     # --no-clean para preservar las imágenes
-DEBUG=0
 
 # =============== VARIABLES GLOBALES ===============
 # Estas se llenarán en generate_vars()
@@ -58,116 +52,9 @@ for arg in "$@"; do
   esac
 done
 
-log() { printf "%s\n" "$*"; }
-dbg() { if [ "$DEBUG" -eq 1 ]; then printf "[DEBUG] %s\n" "$*"; fi }
 
-require_root() {
-  if [ "$EUID" -ne 0 ]; then
-    echo "ERROR: Ejecuta como root: sudo bash $0"
-    exit 1
-  fi
-}
-
-rand_from_list() { local arr=("$@"); printf "%s" "${arr[RANDOM % ${#arr[@]}]}"; }
-rand_size_mb() { local range=$((MAX_MB - MIN_MB + 1)); printf "%d" $(( (RANDOM % range) + MIN_MB )); }
-percent_random() { echo $(( (RANDOM % 41) + 60 )); }  # 60..100
-
-mb_to_gb() {
-  local mb=$1
-  local gb=$(echo "scale=2; $mb / 1024" | bc)
-  printf "%s" "$gb"
-}
-
-ensure_sshpass_local() {
-  if ! command -v sshpass &>/dev/null; then
-    log "[*] sshpass no encontrado en VM1 — intentando instalar..."
-    if command -v apt-get &>/dev/null; then
-      apt-get update -y && apt-get install -y sshpass || true
-    elif command -v dnf &>/dev/null; then
-      dnf install -y epel-release sshpass || true
-    elif command -v yum &>/dev/null; then
-      yum install -y epel-release sshpass || true
-    fi
-    if ! command -v sshpass &>/dev/null; then
-      echo "ERROR: sshpass no pudo instalarse. Instálalo manualmente en VM1."
-      exit 1
-    fi
-  fi
-}
-
-ensure_bc_local() {
-  if ! command -v bc &>/dev/null; then
-    log "[*] bc no encontrado en VM1 — intentando instalar..."
-    if command -v apt-get &>/dev/null; then
-      apt-get update -y && apt-get install -y bc || true
-    elif command -v dnf &>/dev/null; then
-      dnf install -y bc || true
-    elif command -v yum &>/dev/null; then
-      yum install -y bc || true
-    fi
-    if ! command -v bc &>/dev/null; then
-      echo "ERROR: bc no pudo instalarse. Instálalo manualmente en VM1."
-      exit 1
-    fi
-  fi
-}
 
 # =============== GENERAR VARIABLES ALEATORIAS (UNA VEZ) ===============
-generate_vars() {
-  # Declarar todas las variables como globales
-  declare -g ID VG_NAME LV_NAME DEPARTAMENTO NOMBRE_USUARIO IMG1 IMG2
-  declare -g DISK1_MB DISK2_MB DISK1_GB DISK2_GB TOTAL_MB TOTAL_GB
-  declare -g LV_SIZE_MB LV_SIZE LV_SIZE_GB REMOTE_WORKDIR
-  
-  ID="lab-$(date +%s | sha256sum | cut -c1-6)"
-  
-  # Seleccionar aleatoriamente de las listas
-  VG_NAME="$(rand_from_list "${VG_CANDIDATES[@]}")"
-  LV_NAME="$(rand_from_list "${LV_CANDIDATES[@]}")"
-  DEPARTAMENTO="$(rand_from_list "${DEPARTAMENTOS[@]}")"
-  NOMBRE_USUARIO="$(rand_from_list "${USUARIOS[@]}")"
-  
-  # Asegurar que VG y LV no sean iguales
-  [[ "$VG_NAME" == "$LV_NAME" ]] && LV_NAME="${LV_NAME}_lv"
-  
-  # Generar nombres de imágenes
-  IMG1="d1_${ID}.img"
-  IMG2="d2_${ID}.img"
-  
-  # Calcular tamaños de discos
-  DISK1_MB=$(rand_size_mb)
-  DISK2_MB=$(rand_size_mb)
-  
-  # Calcular tamaños en GB para display
-  DISK1_GB=$(mb_to_gb "$DISK1_MB")
-  DISK2_GB=$(mb_to_gb "$DISK2_MB")
-  TOTAL_MB=$((DISK1_MB + DISK2_MB))
-  TOTAL_GB=$(mb_to_gb "$TOTAL_MB")
-  
-  # Calcular tamaño del LV (60-100% del disco más pequeño)
-  PCT=$(percent_random)
-  if [ "$DISK1_MB" -le "$DISK2_MB" ]; then
-    LV_SIZE_MB=$(( DISK1_MB * PCT / 100 ))
-  else
-    LV_SIZE_MB=$(( DISK2_MB * PCT / 100 ))
-  fi
-  LV_SIZE="${LV_SIZE_MB}M"
-  LV_SIZE_GB=$(mb_to_gb "$LV_SIZE_MB")
-  
-  REMOTE_WORKDIR="${REMOTE_WORKDIR_BASE}_${ID}"
-  
-  # Mostrar resumen de variables generadas
-  log "[+] Variables generadas para esta sesión:"
-  log "    ID: ${ID}"
-  log "    VG: ${VG_NAME}"
-  log "    LV: ${LV_NAME}"
-  log "    Departamento: ${DEPARTAMENTO}"
-  log "    Usuario: ${NOMBRE_USUARIO}"
-  log "    Disk1: ${DISK1_MB}MB (${DISK1_GB}GB)"
-  log "    Disk2: ${DISK2_MB}MB (${DISK2_GB}GB)"
-  log "    Total VG: ${TOTAL_MB}MB (${TOTAL_GB}GB)"
-  log "    LV Size: ${LV_SIZE} (${LV_SIZE_GB}GB)"
-}
 
 # =============== MOSTRAR TICKET (USANDO VARIABLES GENERADAS) ===============
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
