@@ -14,7 +14,7 @@ source "${SCRIPT_DIR}/config.sh"
 
 # Cargar módulos funcionales
 source "${SCRIPT_DIR}/utils.sh"
-source "${SCRIPT_DIR}/generators.sh"
+source "${SCRIPT_DIR}./generators/lvm_generator.sh.shh"
 source "${SCRIPT_DIR}/display.sh"
 source "${SCRIPT_DIR}/disk_ops.sh"
 source "${SCRIPT_DIR}/remote_ops.sh"
