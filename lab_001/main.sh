@@ -109,19 +109,6 @@ run_workflow() {
     remote_validator
 }
 
-# =============== EJECUCIÓN ===============
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
-
-
-
-
-
-
-
-
-
 
 # =============== FUNCIÓN PRINCIPAL ===============
 main() {
@@ -142,4 +129,11 @@ main() {
     log "📊 Revisa el informe de validación anterior."
 }
 
-main "$@"
+
+
+
+# =============== EJECUCIÓN ===============
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
+
