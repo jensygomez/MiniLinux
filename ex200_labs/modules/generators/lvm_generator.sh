@@ -5,6 +5,9 @@
 #!/usr/bin/env bash
 # generators.sh - Funciones para generar valores aleatorios
 
+set -euo pipefail
+IFS=$'\n\t'
+
 source ./library/math_utils.sh
 
 

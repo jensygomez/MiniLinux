@@ -2,6 +2,11 @@
 #!/usr/bin/env bash
 # utils.sh - Funciones utilitarias generales
 
+set -euo pipefail
+IFS=$'\n\t'
+
+
+
 log() { printf "%s\n" "$*"; }
 dbg() { if [ "$DEBUG" -eq 1 ]; then printf "[DEBUG] %s\n" "$*"; fi }
 

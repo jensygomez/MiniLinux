@@ -5,6 +5,9 @@
 #!/usr/bin/env bash
 # disk_ops.sh - Funciones para operaciones con discos/imágenes
 
+set -euo pipefail
+IFS=$'\n\t'
+
 # =============== CREAR IMÁGENES LOCALES ===============
 
 create_local_images() {

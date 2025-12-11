@@ -4,7 +4,8 @@
 
 #!/usr/bin/env bash
 # validator.sh - Funciones de validación del estado del sistema
-
+set -euo pipefail
+IFS=$'\n\t'
 
 
 # =============== VALIDADOR REMOTO MEJORADO ===============

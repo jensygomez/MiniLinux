@@ -5,7 +5,8 @@
 #!/usr/bin/env bash
 # remote_ops.sh - Funciones para operaciones remotas (SSH/SCP)
 
-
+set -euo pipefail
+IFS=$'\n\t'
 
 # =============== PREPARAR SCRIPT REMOTO (VM2) ===============
 prepare_remote_script() {
