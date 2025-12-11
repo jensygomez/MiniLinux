@@ -79,7 +79,7 @@ setup_vm_automatico() {
 
     # Verificar conexión primero (adaptado a VM2)
     info "Verificando conexión a VM2..."
-    if sshpass -p "$VM2_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "${VM2_USER}@${VM2_IP}" "echo 'Conexión OK'" &>/dev/null; then
+    if sshpass -p "$VM2_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 "${VM2_USER}@${VM2_IP}" "echo 'Conexión OK'" &>/dev/null; then
         success "Conexión a ${VM2_USER}@${VM2_IP} establecida"
     else
         error "No se pudo conectar a ${VM2_USER}@${VM2_IP}"
@@ -90,7 +90,7 @@ setup_vm_automatico() {
 
     # Crear directorios remotos (como en el snippet)
     log "Creando directorios en VM2..."
-    sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
+    sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${VM2_USER}@${VM2_IP}" \
         "mkdir -p ${REMOTE_DISKS_DIR} && chmod 700 ${REMOTE_DISKS_DIR} && mkdir -p ${REMOTE_WORKDIR} && chmod 700 ${REMOTE_WORKDIR}" || {
         error "No se pudieron crear directorios en VM2"
         SETUP_EXITOSO=false
@@ -109,7 +109,7 @@ setup_vm_automatico() {
 
     # Transferir disco a VM2 (como en snippet, sin &>/dev/null para debug)
     log "Enviando disco a VM2..."
-    sshpass -p "${VM2_PASS}" scp -o StrictHostKeyChecking=no "${disk_path}" "${VM2_USER}@${VM2_IP}:${REMOTE_DISKS_DIR}/" || {
+    sshpass -p "${VM2_PASS}" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${disk_path}" "${VM2_USER}@${VM2_IP}:${REMOTE_DISKS_DIR}/" || {
         error "No se pudo copiar disco a VM2 (verifica permisos o conexión)"
         rm -f "${disk_path}"
         SETUP_EXITOSO=false
@@ -193,7 +193,7 @@ EOF
 
     # Copiar script a VM2
     log "Subiendo script de setup a VM2..."
-    sshpass -p "${VM2_PASS}" scp -o StrictHostKeyChecking=no "${tmp_setup_script}" "${VM2_USER}@${VM2_IP}:${REMOTE_WORKDIR}/remote_setup.sh" || {
+    sshpass -p "${VM2_PASS}" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${tmp_setup_script}" "${VM2_USER}@${VM2_IP}:${REMOTE_WORKDIR}/remote_setup.sh" || {
         error "No se pudo copiar script de setup a VM2"
         rm -f "${tmp_setup_script}" "${disk_path}"
         SETUP_EXITOSO=false
@@ -202,7 +202,7 @@ EOF
 
     # Ejecutar script remoto
     log "Ejecutando setup en VM2..."
-    local setup_result=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
+    local setup_result=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${VM2_USER}@${VM2_IP}" \
         "chmod +x ${REMOTE_WORKDIR}/remote_setup.sh && bash ${REMOTE_WORKDIR}/remote_setup.sh" 2>&1) || {
         error "Ejecución remota fallida en VM2"
         SETUP_EXITOSO=false
@@ -224,7 +224,6 @@ EOF
     # Limpiar local
     rm -f "${disk_path}" "${tmp_setup_script}"
 }
-
 # =============== MOSTRAR TICKET ===============
 mostrar_ticket() {
     clear
