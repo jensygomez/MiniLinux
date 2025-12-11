@@ -3,23 +3,7 @@
 #!/usr/bin/env bash
 # generators.sh - Funciones para generar valores aleatorios
 
-
-
-
-rand_from_list() { 
-    local arr=("$@"); 
-    printf "%s" "${arr[RANDOM % ${#arr[@]}]}"; 
-}
-
-rand_size_mb() { 
-    local range=$((MAX_MB - MIN_MB + 1)); 
-    printf "%d" $(( (RANDOM % range) + MIN_MB )); 
-}
-
-percent_random() { 
-    echo $(( (RANDOM % 41) + 60 )); 
-}  # 60..100
-
+source ./library/math_utils.sh
 
 
 generate_vars() {
