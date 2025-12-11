@@ -6,7 +6,7 @@ set -euo pipefail
 
 # =============== CONFIGURACIÓN ===============
 # Agrega variables para VM2 (cambia a tus valores reales de VM2)
-VM2_IP="192.168.122.111"  # ← CAMBIA A LA IP REAL DE VM2
+VM2_IP="192.168.122.110"  # ← CAMBIA A LA IP REAL DE VM2
 VM2_USER="student"        # ← CAMBIA SI ES DIFERENTE
 VM2_PASS="redhat"         # ← CAMBIA SI ES DIFERENTE
 REMOTE_DISKS_DIR="/tmp/lab_disks"  # Dir dedicado en VM2 para discos
@@ -526,7 +526,8 @@ main() {
     
     # 3. Mostrar ticket con estado real
     mostrar_ticket
-    
+    read -p "Presiona ENTER para Mostrar Instrucciones..." _
+    clear
     # 4. Mostrar instrucciones apropiadas
     mostrar_instrucciones
     
