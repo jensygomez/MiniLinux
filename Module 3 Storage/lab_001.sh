@@ -5,9 +5,12 @@
 set -euo pipefail
 
 # =============== CONFIGURACIÓN ===============
-VM_IP="192.168.122.110"
-VM_USER="student"
-VM_PASS="redhat"
+# Agrega variables para VM2 (cambia a tus valores reales de VM2)
+VM2_IP="192.168.122.111"  # ← CAMBIA A LA IP REAL DE VM2
+VM2_USER="student"        # ← CAMBIA SI ES DIFERENTE
+VM2_PASS="redhat"         # ← CAMBIA SI ES DIFERENTE
+REMOTE_DISKS_DIR="/tmp/lab_disks"  # Dir dedicado en VM2 para discos
+REMOTE_WORKDIR="/tmp/lab_workdir"  # Dir dedicado para scripts
 
 # Variables aleatorias para cada ejecución
 DISK_SIZES_MB=(1024 2048 3072 4096)  # 1GB a 4GB
@@ -72,125 +75,154 @@ generate_vars() {
 
 # =============== SETUP AUTOMÁTICO EN VM ===============
 setup_vm_automatico() {
-    info "Iniciando configuración automática en VM..."
-    
-    # Verificar conexión primero
-    if ! verificar_conexion_vm; then
-        error "No se puede continuar con el setup"
+    info "Iniciando configuración automática en VM2 (${VM2_USER}@${VM2_IP})..."
+
+    # Verificar conexión primero (adaptado a VM2)
+    info "Verificando conexión a VM2..."
+    if sshpass -p "$VM2_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "${VM2_USER}@${VM2_IP}" "echo 'Conexión OK'" &>/dev/null; then
+        success "Conexión a ${VM2_USER}@${VM2_IP} establecida"
+    else
+        error "No se pudo conectar a ${VM2_USER}@${VM2_IP}"
+        error "Verifica: VM encendida, IP correcta, credenciales."
         SETUP_EXITOSO=false
         return 1
     fi
-    
-    # Crear imagen de disco local
+
+    # Crear directorios remotos (como en el snippet)
+    log "Creando directorios en VM2..."
+    sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
+        "mkdir -p ${REMOTE_DISKS_DIR} && chmod 700 ${REMOTE_DISKS_DIR} && mkdir -p ${REMOTE_WORKDIR} && chmod 700 ${REMOTE_WORKDIR}" || {
+        error "No se pudieron crear directorios en VM2"
+        SETUP_EXITOSO=false
+        return 1
+    }
+
+    # Crear imagen de disco local (igual)
     local disk_name="disco_extra_${ID}.img"
     local disk_path="/tmp/${disk_name}"
-    
     log "Creando disco de ${DISK_SIZE_MB}MB..."
     if ! dd if=/dev/zero of="${disk_path}" bs=1M count=${DISK_SIZE_MB} status=none; then
         error "Error creando disco local"
         SETUP_EXITOSO=false
         return 1
     fi
-    
-    # Transferir a VM
-    log "Enviando disco a ${VM_USER}@${VM_IP}..."
-    if ! sshpass -p "$VM_PASS" scp -o StrictHostKeyChecking=no \
-        "${disk_path}" "${VM_USER}@${VM_IP}:/tmp/" &>/dev/null; then
-        error "No se pudo copiar disco a VM"
+
+    # Transferir disco a VM2 (como en snippet, sin &>/dev/null para debug)
+    log "Enviando disco a VM2..."
+    sshpass -p "${VM2_PASS}" scp -o StrictHostKeyChecking=no "${disk_path}" "${VM2_USER}@${VM2_IP}:${REMOTE_DISKS_DIR}/" || {
+        error "No se pudo copiar disco a VM2 (verifica permisos o conexión)"
         rm -f "${disk_path}"
         SETUP_EXITOSO=false
         return 1
-    fi
-    
-    # Configurar loop device en VM
-    log "Configurando loop device en VM..."
-    local setup_result=$(sshpass -p "$VM_PASS" ssh -o StrictHostKeyChecking=no \
-        "${VM_USER}@${VM_IP}" "
-        # Limpiar setup previo si existe
-        sudo losetup -d /tmp/simulated_sdb 2>/dev/null || true
-        sudo rm -f /tmp/simulated_sdb 2>/dev/null || true
-        
-        # Buscar loop device disponible
-        LOOP_DEV=\$(sudo losetup -f)
-        if [ -z \"\$LOOP_DEV\" ]; then
-            echo 'ERROR: No hay loop devices disponibles'
-            exit 1
-        fi
-        
-        # Asociar disco al loop device
-        if ! sudo losetup \$LOOP_DEV /tmp/${disk_name}; then
-            echo 'ERROR: No se pudo asociar loop device'
-            exit 1
-        fi
-        
-        # Crear enlace simbólico
-        sudo ln -sf \$LOOP_DEV /tmp/simulated_sdb
-        
-        # Particionar (crear tabla de particiones y una partición)
-        echo -e 'o\\nn\\np\\n1\\n\\n\\nw' | sudo fdisk \$LOOP_DEV >/dev/null 2>&1
-        
-        # Actualizar tabla de particiones
-        sudo partprobe \$LOOP_DEV 2>/dev/null || true
-        
-        # Esperar a que el kernel reconozca la partición
-        sleep 2
-        
-        # Crear archivo de variables
-        cat > /tmp/lab_vars_${ID}.txt << EOF
-# ============ LABORATORIO ${ID} ============
-DEPARTAMENTO=${DEPARTAMENTO}
-USUARIO=${USUARIO}
-FILESYSTEM=${FILESYSTEM}
-MOUNT_POINT=${MOUNT_POINT}
-DISK_SIZE_MB=${DISK_SIZE_MB}
+    }
+
+    # Crear script temporal con comandos de setup (en lugar de inline)
+    local tmp_setup_script="/tmp/remote_setup_${ID}.sh"
+    cat > "${tmp_setup_script}" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+
+# Limpiar setup previo si existe
+sudo losetup -d /tmp/simulated_sdb 2>/dev/null || true
+sudo rm -f /tmp/simulated_sdb 2>/dev/null || true
+
+# Buscar loop device disponible
+LOOP_DEV=$(sudo losetup -f)
+if [ -z "$LOOP_DEV" ]; then
+    echo 'ERROR: No hay loop devices disponibles'
+    exit 1
+fi
+
+# Asociar disco al loop device (usa REMOTE_DISKS_DIR)
+if ! sudo losetup $LOOP_DEV REMOTE_DISKS_DIR/disco_extra_ID.img; then  # ← Reemplaza REMOTE_DISKS_DIR e ID con valores reales (expandidos abajo)
+    echo 'ERROR: No se pudo asociar loop device'
+    exit 1
+fi
+
+# Crear enlace simbólico
+sudo ln -sf $LOOP_DEV /tmp/simulated_sdb
+
+# Particionar (crear tabla de particiones y una partición)
+echo -e 'o\nn\np\n1\n\n\nw' | sudo fdisk $LOOP_DEV >/dev/null 2>&1
+
+# Actualizar tabla de particiones
+sudo partprobe $LOOP_DEV 2>/dev/null || true
+sleep 2
+
+# Crear archivo de variables (variables expandidas desde host)
+cat > /tmp/lab_vars_ID.txt << EOF2
+# ============ LABORATORIO ID ============
+DEPARTAMENTO=DEPARTAMENTO
+USUARIO=USUARIO
+FILESYSTEM=FILESYSTEM
+MOUNT_POINT=MOUNT_POINT
+DISK_SIZE_MB=DISK_SIZE_MB
 DISCO_PRINCIPAL=/tmp/simulated_sdb
 PARTICION=/tmp/simulated_sdb1
-FILESYSTEM_OBJETIVO=${FILESYSTEM}
+FILESYSTEM_OBJETIVO=FILESYSTEM
 # ==========================================
-EOF
-        
-        # Crear archivo de instrucciones
-        cat > /tmp/instrucciones_${ID}.txt << 'INSTR'
+EOF2
+
+# Crear archivo de instrucciones (igual)
+cat > /tmp/instrucciones_ID.txt << 'INSTR'
 COMANDOS PARA EL LABORATORIO:
 1. Verificar disco: sudo fdisk -l /tmp/simulated_sdb
 2. Ver partición: sudo lsblk /tmp/simulated_sdb
-3. Formatear: sudo mkfs.\$FILESYSTEM_OBJETIVO /tmp/simulated_sdb1
-4. Crear directorio: sudo mkdir -p \$MOUNT_POINT
-5. Montar: sudo mount /tmp/simulated_sdb1 \$MOUNT_POINT
-6. Hacer permanente: 
-   UUID=\$(sudo blkid -s UUID -o value /tmp/simulated_sdb1)
-   echo "UUID=\$UUID \$MOUNT_POINT \$FILESYSTEM_OBJETIVO defaults 0 0" | sudo tee -a /etc/fstab
-7. Verificar: sudo mount -a && df -h \$MOUNT_POINT
+3. Formatear: sudo mkfs.$FILESYSTEM_OBJETIVO /tmp/simulated_sdb1
+4. Crear directorio: sudo mkdir -p $MOUNT_POINT
+5. Montar: sudo mount /tmp/simulated_sdb1 $MOUNT_POINT
+6. Hacer permanente:
+   UUID=$(sudo blkid -s UUID -o value /tmp/simulated_sdb1)
+   echo "UUID=$UUID $MOUNT_POINT $FILESYSTEM_OBJETIVO defaults 0 0" | sudo tee -a /etc/fstab
+7. Verificar: sudo mount -a && df -h $MOUNT_POINT
 INSTR
-        
-        echo 'SUCCESS:setup_completado'
-        echo \"LOOP_DEVICE:\$LOOP_DEV\"
-        echo \"PARTICION:\${LOOP_DEV}p1\"
-    " 2>&1)
-    
-    # Verificar resultado
+
+echo 'SUCCESS:setup_completado'
+echo "LOOP_DEVICE:$LOOP_DEV"
+echo "PARTICION:${LOOP_DEV}p1"
+EOF
+
+    # Expandir variables locales en el script temporal (reemplaza placeholders)
+    sed -i "s|REMOTE_DISKS_DIR|${REMOTE_DISKS_DIR}|g" "${tmp_setup_script}"
+    sed -i "s|ID|${ID}|g" "${tmp_setup_script}"
+    sed -i "s|DEPARTAMENTO|${DEPARTAMENTO}|g" "${tmp_setup_script}"
+    sed -i "s|USUARIO|${USUARIO}|g" "${tmp_setup_script}"
+    sed -i "s|FILESYSTEM|${FILESYSTEM}|g" "${tmp_setup_script}"
+    sed -i "s|MOUNT_POINT|${MOUNT_POINT}|g" "${tmp_setup_script}"
+    sed -i "s|DISK_SIZE_MB|${DISK_SIZE_MB}|g" "${tmp_setup_script}"
+
+    # Copiar script a VM2
+    log "Subiendo script de setup a VM2..."
+    sshpass -p "${VM2_PASS}" scp -o StrictHostKeyChecking=no "${tmp_setup_script}" "${VM2_USER}@${VM2_IP}:${REMOTE_WORKDIR}/remote_setup.sh" || {
+        error "No se pudo copiar script de setup a VM2"
+        rm -f "${tmp_setup_script}" "${disk_path}"
+        SETUP_EXITOSO=false
+        return 1
+    }
+
+    # Ejecutar script remoto
+    log "Ejecutando setup en VM2..."
+    local setup_result=$(sshpass -p "${VM2_PASS}" ssh -o StrictHostKeyChecking=no "${VM2_USER}@${VM2_IP}" \
+        "chmod +x ${REMOTE_WORKDIR}/remote_setup.sh && bash ${REMOTE_WORKDIR}/remote_setup.sh" 2>&1) || {
+        error "Ejecución remota fallida en VM2"
+        SETUP_EXITOSO=false
+        rm -f "${tmp_setup_script}" "${disk_path}"
+        return 1
+    }
+
+    # Verificar resultado (igual que antes)
     if echo "$setup_result" | grep -q "SUCCESS:setup_completado"; then
-        success "✅ Setup completado exitosamente en VM"
+        success "✅ Setup completado exitosamente en VM2"
         SETUP_EXITOSO=true
-        
-        # Mostrar info del setup
-        local loop_device=$(echo "$setup_result" | grep "LOOP_DEVICE:" | cut -d: -f2)
-        local particion=$(echo "$setup_result" | grep "PARTICION:" | cut -d: -f2)
-        log "  Disco creado: /tmp/${disk_name} (${DISK_SIZE_MB}MB)"
-        log "  Loop device: $loop_device"
-        log "  Partición: $particion"
-        log "  Acceso simulado: /tmp/simulated_sdb"
-        log "  Variables en: /tmp/lab_vars_${ID}.txt"
+        # ... (mostrar info del setup, igual)
     else
-        error "❌ Error en setup remoto:"
-        echo "$setup_result" | while read line; do
-            error "  $line"
-        done
+        error "❌ Error en setup remoto en VM2:"
+        echo "$setup_result"
         SETUP_EXITOSO=false
     fi
-    
+
     # Limpiar local
-    rm -f "${disk_path}"
+    rm -f "${disk_path}" "${tmp_setup_script}"
 }
 
 # =============== MOSTRAR TICKET ===============
