@@ -4,10 +4,11 @@ set -euo pipefail
 IFS=$'\n\t'
 
 
-#
 # =============================================================
-#   STORAGE MENU – CARGA DINÁMICA DE MÓDULOS SOLO AL ENTRAR
+#   RESOLVER RUTA RAÍZ DEL PROYECTO
 # =============================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../../" && pwd)"
 
 
 
@@ -15,16 +16,17 @@ IFS=$'\n\t'
 #   CARGA DINÁMICA DE MÓDULOS AL INICIAR STORAGE
 # =============================================================
 storage_load_modules() {
-    source Labs/03_storage/crear_pv.sh
-    source Labs/03_storage/crear_vg.sh
-    source Labs/03_storage/crear_lv.sh
-    source Labs/03_storage/expandir_lv_fs.sh
-    source Labs/03_storage/reducir_lv_fs.sh
-    source Labs/03_storage/migrar_pvmove.sh
+    # Cargar LVM labs
+    source "${SCRIPT_DIR}/crear_pv.sh"
+    source "${SCRIPT_DIR}/crear_vg.sh"
+    source "${SCRIPT_DIR}/crear_lv.sh"
+    source "${SCRIPT_DIR}/expandir_lv_fs.sh"
+    source "${SCRIPT_DIR}/reducir_lv_fs.sh"
+    source "${SCRIPT_DIR}/migrar_pvmove.sh"
 
-    # Solo si los labs lo necesitan
-    source modules/math_utils.sh
-    source modules/utils.sh
+    # Cargar módulos comunes
+    source "${ROOT_DIR}/modules/math_utils.sh"
+    source "${ROOT_DIR}/modules/utils.sh"
 }
 
 # =============================================================
