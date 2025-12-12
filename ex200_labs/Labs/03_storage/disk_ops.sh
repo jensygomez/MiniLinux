@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# disk_ops.sh - Funciones para operaciones con discos/imágenes
+# ex200_labs/Labs/03_storage/disk_ops.sh
 
 set -euo pipefail
 IFS=$'\n\t'
