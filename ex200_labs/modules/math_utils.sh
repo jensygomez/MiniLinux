@@ -1,7 +1,3 @@
-
-
-
-# lab_001/library/math_utils.sh
 #!/usr/bin/env bash
 set -euo pipefail
 IFS=$'\n\t'

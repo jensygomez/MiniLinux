@@ -1,8 +1,4 @@
-
-
-
 #!/usr/bin/env bash
-# display.sh - Funciones para mostrar información al usuario
 
 set -euo pipefail
 IFS=$'\n\t'

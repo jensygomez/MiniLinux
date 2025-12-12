@@ -1,7 +1,4 @@
-
-
 #!/usr/bin/env bash
-# config.sh - Configuraciones y constantes del sistema
 set -euo pipefail
 IFS=$'\n\t'
 

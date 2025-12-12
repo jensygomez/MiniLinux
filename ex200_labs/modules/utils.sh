@@ -1,6 +1,4 @@
-
 #!/usr/bin/env bash
-# utils.sh - Funciones utilitarias generales
 
 set -euo pipefail
 IFS=$'\n\t'
