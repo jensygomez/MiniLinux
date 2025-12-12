@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
-# ex200_labs/Labs/03_storage/storage__crear_lv.sh
+# ex200_labs/Labs/03_storage/crear_lv.sh
 set -euo pipefail
 IFS=$'\n\t'
 
 
 # =============== CARGAR MÓDULOS ===============
+# ===================== RUTAS BASE =====================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Cargar configuración primero
-source "${SCRIPT_DIR}/config.sh"
-
-# Cargar módulos funcionales
-${ROOT_DIR}/modules/utils.sh
+ROOT_DIR="${SCRIPT_DIR}/../.."
 
 
+# ===================== CARGA DE MÓDULOS =====================
+source "${ROOT_DIR}/modules/config.sh"
+source "${ROOT_DIR}/modules/utils.sh"
+source "${ROOT_DIR}/modules/math_utils.sh"
+source "${ROOT_DIR}/modules/display.sh"
+source "${ROOT_DIR}/modules/validator.sh"
+source "${ROOT_DIR}/modules/remote_ops.sh"
+source "${ROOT_DIR}/modules/generators/lvm_generator.sh"
+source "${ROOT_DIR}/Labs/03_storage/disk_ops.sh"
 
 
-# =============== VARIABLES GLOBALES ===============
-# Estas se llenarán en generate_vars()
+
+# ===================== VARIABLES GLOBALES =====================
 ID=""
 VG_NAME=""
 LV_NAME=""
@@ -36,11 +41,8 @@ LV_SIZE=""
 LV_SIZE_GB=""
 REMOTE_WORKDIR=""
 
-# Variables temporales
 TMP_REMOTE_SCRIPT=""
-
-# Flags de control
-CLEAN_LOCAL=true  # --no-clean para preservar imágenes
+CLEAN_LOCAL=true
 DEBUG=0
 
 
