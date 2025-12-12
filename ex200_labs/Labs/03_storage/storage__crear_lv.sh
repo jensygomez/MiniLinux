@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# lab_setup_and_validate.sh
-# Prepara entorno LVM (2 discos) en VM2, muestra ticket, pausa y luego valida los items del ticket.
-# Uso: sudo bash lab_setup_and_validate.sh [--no-clean] [--debug]
+# ex200_labs/Labs/03_storage/storage__crear_lv.sh
 set -euo pipefail
 IFS=$'\n\t'
 
