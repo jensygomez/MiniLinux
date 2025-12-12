@@ -33,7 +33,9 @@ menu_principal() {
                 ;;
             3)
                 # Aquí se carga dinámicamente SOLO cuando el usuario lo pide
-                source modules/menu_storage.sh
+                source "${SCRIPT_DIR}/modules/menu_storage.sh"
+
+
                 storage_menu
                 ;;
             4)
