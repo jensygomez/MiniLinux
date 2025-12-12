@@ -59,19 +59,39 @@ storage_menu() {
         echo "-----------------------------------------"
         read -p "Seleccione una opción: " opcion_storage
 
-        case "$opcion_storage" in
-            1) storage__crear_pv ;;
-            2) storage__crear_vg ;;
-            3) storage__crear_lv ;;
-            4) storage__expandir_lv_fs ;;
-            5) storage__reducir_lv_fs ;;
-            6) storage__migrar_pvmove ;;
-            0) return ;;
+        case "$opcion" in
+            1)
+                source "${SCRIPT_DIR}/Labs/03_storage/crear_pv.sh"
+                storage__crear_pv
+                ;;
+            2)
+                source "${SCRIPT_DIR}/Labs/03_storage/crear_vg.sh"
+                storage__crear_vg
+                ;;
+            3)
+                source "${SCRIPT_DIR}/Labs/03_storage/crear_lv.sh"
+                storage__crear_lv
+                ;;
+            4)
+                source "${SCRIPT_DIR}/Labs/03_storage/expandir_lv_fs.sh"
+                storage__expandir_lv_fs
+                ;;
+            5)
+                source "${SCRIPT_DIR}/Labs/03_storage/reducir_lv_fs.sh"
+                storage__reducir_lv_fs
+                ;;
+            6)
+                source "${SCRIPT_DIR}/Labs/03_storage/migrar_pvmove.sh"
+                storage__migrar_pvmove
+                ;;
+            0)
+                return
+                ;;
             *)
                 echo "Opción inválida"
-                sleep 1
                 ;;
         esac
+
 
         echo
         read -p "Presione ENTER para continuar..."
