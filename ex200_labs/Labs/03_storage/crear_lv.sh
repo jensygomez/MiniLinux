@@ -133,3 +133,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
 
+storage__crear_lv() {
+    main "$@"
+}
