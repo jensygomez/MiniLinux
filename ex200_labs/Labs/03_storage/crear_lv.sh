@@ -128,11 +128,7 @@ main() {
 
 
 
-# =============== EJECUCIÓN ===============
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
-
+# =============== FUNCIÓN PÚBLICA PARA EL MENÚ ===============
 storage__crear_lv() {
     main "$@"
 }
