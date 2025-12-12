@@ -1,55 +1,61 @@
 #!/usr/bin/env bash
-# ex200_labs/Labs/03_storage/menu_storage.sh
+# ex200_labs/modules/menu_storage.sh
 set -euo pipefail
 IFS=$'\n\t'
 
-
 # =============================================================
-#   RESOLVER RUTA RAÍZ DEL PROYECTO
+#  DEFINIR ROOT_DIR DESDE ESTE MÓDULO
 # =============================================================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/../../" && pwd)"
-
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 
 # =============================================================
-#   CARGA DINÁMICA DE MÓDULOS AL INICIAR STORAGE
+#  CARGA DINÁMICA DE MÓDULOS AL ENTRAR AL MENÚ STORAGE
 # =============================================================
 storage_load_modules() {
-    # Cargar LVM labs
-    source "${SCRIPT_DIR}/crear_pv.sh"
-    source "${SCRIPT_DIR}/crear_vg.sh"
-    source "${SCRIPT_DIR}/crear_lv.sh"
-    source "${SCRIPT_DIR}/expandir_lv_fs.sh"
-    source "${SCRIPT_DIR}/reducir_lv_fs.sh"
-    source "${SCRIPT_DIR}/migrar_pvmove.sh"
 
-    # Cargar módulos comunes
-    source "${ROOT_DIR}/modules/math_utils.sh"
+    # --- Cargar configuración global ---
+    source "${ROOT_DIR}/modules/config.sh"
+
+    # --- Cargar módulos funcionales genéricos ---
     source "${ROOT_DIR}/modules/utils.sh"
+    source "${ROOT_DIR}/modules/math_utils.sh"
+    source "${ROOT_DIR}/modules/display.sh"
+    source "${ROOT_DIR}/modules/remote_ops.sh"
+    source "${ROOT_DIR}/modules/validator.sh"
+    source "${ROOT_DIR}/modules/generators/lvm_generator.sh"
+
+    # --- Cargar los Laboratorios específicos de LVM ---
+    source "${ROOT_DIR}/Labs/03_storage/crear_pv.sh"
+    source "${ROOT_DIR}/Labs/03_storage/crear_vg.sh"
+    source "${ROOT_DIR}/Labs/03_storage/crear_lv.sh"
+    source "${ROOT_DIR}/Labs/03_storage/expandir_lv_fs.sh"
+    source "${ROOT_DIR}/Labs/03_storage/reducir_lv_fs.sh"
+    source "${ROOT_DIR}/Labs/03_storage/migrar_pvmove.sh"
 }
 
+
 # =============================================================
-#   MENÚ STORAGE
+#  MENÚ STORAGE – SOLO SE CARGAN MÓDULOS AL ENTRAR
 # =============================================================
 storage_menu() {
 
-    # 1. Cargar módulos necesarios SOLO al acceder al menú
+    # 1. Cargar módulos dinámicamente
     storage_load_modules
 
-    # 2. Ejecutar menú
+    # 2. Menú
     while true; do
         clear
         echo "========================================="
-        echo "             STORAGE - LABS"
+        echo "               STORAGE - LABS"
         echo "========================================="
         echo "1) Crear Physical Volumes"
         echo "2) Crear Volume Group"
         echo "3) Crear Logical Volume"
         echo "4) Expandir LV + FS"
-        echo "5) Reducir LV + FS (avanzado)"
-        echo "6) Migración de discos con pvmove"
-        echo "0) Volver"
+        echo "5) Reducir LV + FS"
+        echo "6) Migración con pvmove"
+        echo "0) Volver al menú principal"
         echo "-----------------------------------------"
         read -p "Seleccione una opción: " opcion_storage
 
@@ -61,9 +67,9 @@ storage_menu() {
             5) storage__reducir_lv_fs ;;
             6) storage__migrar_pvmove ;;
             0) return ;;
-            *) 
+            *)
                 echo "Opción inválida"
-                sleep 1 
+                sleep 1
                 ;;
         esac
 
