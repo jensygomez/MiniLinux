@@ -25,13 +25,7 @@ storage_load_modules() {
     source "${ROOT_DIR}/modules/validator.sh"
     source "${ROOT_DIR}/modules/generators/lvm_generator.sh"
 
-    # --- Cargar los Laboratorios específicos de LVM ---
-    source "${ROOT_DIR}/Labs/03_storage/crear_pv.sh"
-    source "${ROOT_DIR}/Labs/03_storage/crear_vg.sh"
-    source "${ROOT_DIR}/Labs/03_storage/crear_lv.sh"
-    source "${ROOT_DIR}/Labs/03_storage/expandir_lv_fs.sh"
-    source "${ROOT_DIR}/Labs/03_storage/reducir_lv_fs.sh"
-    source "${ROOT_DIR}/Labs/03_storage/migrar_pvmove.sh"
+ 
 }
 
 
