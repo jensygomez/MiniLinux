@@ -3,12 +3,11 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# -------------------------
-# Detect project root and source common modules (robusto)
-# -------------------------
+# Cargar configuración global y librerías
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "${PROJECT_ROOT}/modules/config.sh"
 source "${PROJECT_ROOT}/modules/math_utils.sh"
-source "${PROJECT_ROOT}/modules/utils.sh"   # para 'log' y otras utilidades
+source "${PROJECT_ROOT}/modules/utils.sh"
 
 # =============== CREAR IMÁGENES LOCALES ===============
 create_local_images() {

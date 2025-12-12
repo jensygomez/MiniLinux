@@ -4,13 +4,11 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # -------------------------
-# Detect project root and source common modules (robusto)
-# -------------------------
+# Cargar configuración global y librerías
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# Cargar módulo matemático y utils (log, mb_to_gb puede estar aquí o en math_utils)
-# Ajusta si tu estructura difiere
+source "${PROJECT_ROOT}/modules/config.sh"
 source "${PROJECT_ROOT}/modules/math_utils.sh"
-source "${PROJECT_ROOT}/modules/utils.sh"   # para usar 'log', 'require_root', etc.
+source "${PROJECT_ROOT}/modules/utils.sh"
 
 
 generate_vars() {
