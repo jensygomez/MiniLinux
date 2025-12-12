@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # ex200_labs/Labs/03_storage/disk_ops.sh
-
 set -euo pipefail
 IFS=$'\n\t'
 
-# =============== CREAR IMÁGENES LOCALES ===============
+# -------------------------
+# Detect project root and source common modules (robusto)
+# -------------------------
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "${PROJECT_ROOT}/modules/math_utils.sh"
+source "${PROJECT_ROOT}/modules/utils.sh"   # para 'log' y otras utilidades
 
+# =============== CREAR IMÁGENES LOCALES ===============
 create_local_images() {
   mkdir -p "${LOCAL_DISKS_DIR}"
   log "[+] Creando imágenes locales en ${LOCAL_DISKS_DIR}:"
@@ -17,7 +22,6 @@ create_local_images() {
 
   log "[✓] Imágenes creadas."
 }
-
 
 
 
