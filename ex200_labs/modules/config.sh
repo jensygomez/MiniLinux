@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# ex200_labs/modules/config.sh
 set -euo pipefail
 IFS=$'\n\t'
 
