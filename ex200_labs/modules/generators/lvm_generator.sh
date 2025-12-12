@@ -3,7 +3,14 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-source ./library/math_utils.sh
+# -------------------------
+# Detect project root and source common modules (robusto)
+# -------------------------
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Cargar módulo matemático y utils (log, mb_to_gb puede estar aquí o en math_utils)
+# Ajusta si tu estructura difiere
+source "${PROJECT_ROOT}/modules/math_utils.sh"
+source "${PROJECT_ROOT}/modules/utils.sh"   # para usar 'log', 'require_root', etc.
 
 
 generate_vars() {
@@ -27,25 +34,27 @@ generate_vars() {
   IMG1="d1_${ID}.img"
   IMG2="d2_${ID}.img"
   
-  # Calcular tamaños de discos
-  DISK1_MB=$(rand_size_mb)
-  DISK2_MB=$(rand_size_mb)
+  # Calcular tamaños de discos (usa funciones centralizadas)
+  DISK1_MB="$(rand_size_mb)"
+  DISK2_MB="$(rand_size_mb)"
   
-  # Calcular tamaños en GB para display
-  DISK1_GB=$(mb_to_gb "$DISK1_MB")
-  DISK2_GB=$(mb_to_gb "$DISK2_MB")
-  TOTAL_MB=$((DISK1_MB + DISK2_MB))
-  TOTAL_GB=$(mb_to_gb "$TOTAL_MB")
+  # Calcular tamaños en GB para display (usa mb_to_gb del módulo)
+  DISK1_GB="$(mb_to_gb "$DISK1_MB")"
+  DISK2_GB="$(mb_to_gb "$DISK2_MB")"
   
-  # Calcular tamaño del LV (60-100% del disco más pequeño)
-  PCT=$(percent_random)
-  if [ "$DISK1_MB" -le "$DISK2_MB" ]; then
-    LV_SIZE_MB=$(( DISK1_MB * PCT / 100 ))
-  else
-    LV_SIZE_MB=$(( DISK2_MB * PCT / 100 ))
-  fi
+  # Total con función 'add' para consistencia
+  TOTAL_MB="$(add "$DISK1_MB" "$DISK2_MB")"
+  TOTAL_GB="$(mb_to_gb "$TOTAL_MB")"
+  
+# Calcular tamaño del LV (60-100% del disco más pequeño)
+  PCT="$(percent_random)"
+  # elegir el menor con función 'min'
+  SMALLER_MB="$(min "$DISK1_MB" "$DISK2_MB")"
+  # calcular LV size como X% del más pequeño usando apply_percentage
+  LV_SIZE_MB="$(apply_percentage "$SMALLER_MB" "$PCT")"
+  
   LV_SIZE="${LV_SIZE_MB}M"
-  LV_SIZE_GB=$(mb_to_gb "$LV_SIZE_MB")
+  LV_SIZE_GB="$(mb_to_gb "$LV_SIZE_MB")"
   
   REMOTE_WORKDIR="${REMOTE_WORKDIR_BASE}_${ID}"
   
