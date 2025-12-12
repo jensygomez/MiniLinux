@@ -3,21 +3,6 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# ----------------------------------------------------
-# 1. CARGAR MÓDULOS GENERALES
-# ----------------------------------------------------
-for module in modules/*.sh; do
-    source "$module"
-done
-
-# En esta etapa solo cargamos:
-# - config.sh
-# - display.sh
-# - math_utils.sh
-# - utils.sh
-# - remote_ops.sh
-# - validator.sh
-
 
 # ----------------------------------------------------
 # 2. MENÚ PRINCIPAL
@@ -47,7 +32,8 @@ menu_principal() {
                 read -p "ENTER para continuar..."
                 ;;
             3)
-                # Aquí SÍ llamamos al submenú Storage (pero el propio storage carga sus módulos)
+                # Aquí se carga dinámicamente SOLO cuando el usuario lo pide
+                source modules/menu_storage.sh
                 storage_menu
                 ;;
             4)

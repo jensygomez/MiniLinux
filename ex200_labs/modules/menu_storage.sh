@@ -3,22 +3,28 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+
+#
 # =============================================================
 #   STORAGE MENU – CARGA DINÁMICA DE MÓDULOS SOLO AL ENTRAR
 # =============================================================
+
+
+
+# =============================================================
+#   CARGA DINÁMICA DE MÓDULOS AL INICIAR STORAGE
+# =============================================================
 storage_load_modules() {
-    local storage_modules_dir="modules/storage"
+    source Labs/03_storage/crear_pv.sh
+    source Labs/03_storage/crear_vg.sh
+    source Labs/03_storage/crear_lv.sh
+    source Labs/03_storage/expandir_lv_fs.sh
+    source Labs/03_storage/reducir_lv_fs.sh
+    source Labs/03_storage/migrar_pvmove.sh
 
-    # Crear directorio si no existe
-    if [[ ! -d "$storage_modules_dir" ]]; then
-        echo "ERROR: No existe el directorio $storage_modules_dir"
-        exit 1
-    fi
-
-    # Cargar todos los módulos de storage
-    for module in "$storage_modules_dir"/*.sh; do
-        source "$module"
-    done
+    # Solo si los labs lo necesitan
+    source modules/math_utils.sh
+    source modules/utils.sh
 }
 
 # =============================================================
