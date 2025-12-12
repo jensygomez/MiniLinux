@@ -3,6 +3,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# ----------------------------------------------------
+# 0. DEFINIR RUTA BASE DEL PROYECTO
+# ----------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ----------------------------------------------------
 # 2. MENÚ PRINCIPAL
@@ -32,10 +36,8 @@ menu_principal() {
                 read -p "ENTER para continuar..."
                 ;;
             3)
-                # Aquí se carga dinámicamente SOLO cuando el usuario lo pide
+                # Cargar el menú del Storage solo cuando se use
                 source "${SCRIPT_DIR}/modules/menu_storage.sh"
-
-
                 storage_menu
                 ;;
             4)
