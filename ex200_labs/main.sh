@@ -1,62 +1,75 @@
 #!/usr/bin/env bash
 # ex200_labs/main.sh
-# Menú principal del proyecto EX200 Labs
-
 set -euo pipefail
 IFS=$'\n\t'
 
-# =====================================================
-#   1. Determinar la ruta del proyecto (PROJECT_ROOT)
-# =====================================================
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# =====================================================
-#   2. Cargar TODOS los módulos automáticamente
-# =====================================================
-for module in "${PROJECT_ROOT}"/modules/*.sh; do
-    # Evitar cargar archivos vacíos
-    [ -s "$module" ] && source "$module"
+# ----------------------------------------------------
+# 1. CARGAR MÓDULOS GENERALES
+# ----------------------------------------------------
+for module in modules/*.sh; do
+    source "$module"
 done
 
-# =====================================================
-#   3. Cargar submódulos de Labs si existen
-# =====================================================
-for module in "${PROJECT_ROOT}"/Labs/*/*.sh; do
-    [ -s "$module" ] && source "$module"
-done
+# En esta etapa solo cargamos:
+# - config.sh
+# - display.sh
+# - math_utils.sh
+# - utils.sh
+# - remote_ops.sh
+# - validator.sh
 
-# =====================================================
-#   4. MENU PRINCIPAL
-# =====================================================
+
+# ----------------------------------------------------
+# 2. MENÚ PRINCIPAL
+# ----------------------------------------------------
 menu_principal() {
     while true; do
         clear
-        echo "========================================="
-        echo "        EX200 - LABS PRINCIPALES"
-        echo "========================================="
+        echo "================================================="
+        echo "            EX200 – SISTEMA DE LABS"
+        echo "================================================="
         echo "1) Essential Tools"
         echo "2) Manage Software"
-        echo "3) Storage"
+        echo "3) Storage (LVM)"
         echo "4) Networking"
         echo "5) SELinux"
         echo "0) Salir"
-        echo "-----------------------------------------"
-        echo -n "Seleccione una opción: "
-        read opcion
+        echo "-------------------------------------------------"
+        read -p 'Seleccione una opción: ' opcion
 
         case "$opcion" in
-            1) menu_essential ;;
-            2) menu_software ;;
-            3) menu_storage ;;   # <<< viene del submenú Storage
-            4) menu_networking ;;
-            5) menu_selinux ;;
-            0) exit 0 ;;
+            1)
+                echo "Essential Tools (en construcción)"
+                read -p "ENTER para continuar..."
+                ;;
+            2)
+                echo "Manage Software (en construcción)"
+                read -p "ENTER para continuar..."
+                ;;
+            3)
+                # Aquí SÍ llamamos al submenú Storage (pero el propio storage carga sus módulos)
+                storage_menu
+                ;;
+            4)
+                echo "Networking (en construcción)"
+                read -p "ENTER para continuar..."
+                ;;
+            5)
+                echo "SELinux (en construcción)"
+                read -p "ENTER para continuar..."
+                ;;
+            0)
+                exit 0
+                ;;
             *)
-                echo "Opción inválida..."
+                echo "Opción inválida"
                 sleep 1
                 ;;
         esac
     done
 }
 
+# ----------------------------------------------------
+# 3. LLAMADA AL PROGRAMA PRINCIPAL
+# ----------------------------------------------------
 menu_principal
