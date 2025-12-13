@@ -32,12 +32,12 @@ mostrar_ticket() {
     echo ""
     echo -e "${GREEN}💻 TAREAS PENDIENTES:${NC}"
     for i in "${!SELECTED_BOOLEANS[@]}"; do
-        echo "1.$((i+1)) Ajustar boolean: ${SELECTED_BOOLEANS[$i]} → ${EXPECTED_STATE[$i]}"
+        echo "1.$((i+1)) Ajustar boolean: ${SELECTED_BOOLEANS[$i]} → ${EXPECTED_STATES[$i]}"
     done
     echo ""
     echo -e "${GREEN}✅ CRITERIOS DE ACEPTACIÓN:${NC}"
     for i in "${!SELECTED_BOOLEANS[@]}"; do
-        echo "- 'getsebool ${SELECTED_BOOLEANS[$i]}' devuelve ${EXPECTED_STATE[$i]}"
+        echo "- 'getsebool ${SELECTED_BOOLEANS[$i]}' devuelve ${EXPECTED_STATES[$i]}"
     done
     echo ""
     echo -e "${RED}⏰ PRESIÓN ADICIONAL:${NC}"

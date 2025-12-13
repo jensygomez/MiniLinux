@@ -47,7 +47,7 @@ run_validation() {
     local failures=0
     for i in "${!SELECTED_BOOLEANS[@]}"; do
         boolean="${SELECTED_BOOLEANS[$i]}"
-        expected="${EXPECTED_STATE[$i]}"
+        expected="${EXPECTED_STATES[$i]}"
         if ! validate_boolean "$boolean" "$expected"; then
             ((failures++))
         fi
