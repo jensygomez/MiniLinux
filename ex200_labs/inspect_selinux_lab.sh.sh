@@ -30,7 +30,7 @@ LAB_DIR="${LAB_BASE_DIR}/${LAB_NAME}"
 FILES=(
   "config.sh"
   "generator.sh"
-  "lab.sh"
+  "main.sh"
   "ticket.sh"
   "validator.sh"
 )
