@@ -27,7 +27,7 @@ LAB_VERSION="1.0"
 # 2 = Intermedio
 # 3 = Avanzado
 # 4 = Super Avanzado
-LAB_DIFFICULTY_LEVEL=1
+LAB_DIFFICULTY_LEVEL=$(shuf -i 1-4 -n 1)
 
 declare -A LAB_DIFFICULTY_NAME=(
     [1]="Basico"
