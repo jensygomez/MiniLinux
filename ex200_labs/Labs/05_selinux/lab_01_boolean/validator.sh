@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ex200_labs/Labs/06_selinux/lab_01_boolean/validator.sh
+# ex200_labs/Labs/05_selinux/lab_01_boolean/validator.sh
 set -euo pipefail
 IFS=$'\n\t'
 

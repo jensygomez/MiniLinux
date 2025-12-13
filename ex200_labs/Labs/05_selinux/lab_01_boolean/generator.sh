@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ex200_labs/modules/generators/selinux_generator.sh
+# ex200_labs/Labs/05_selinux/lab_01_boolean/generator.sh
 set -euo pipefail
 IFS=$'\n\t'
 

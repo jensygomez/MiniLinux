@@ -1,83 +1,122 @@
 #!/usr/bin/env bash
-# ex200_labs/Labs/06_selinux/lab_01_boolean/config.sh
+# ex200_labs/Labs/05_selinux/lab_01_boolean/config.sh
+
+
+
+# =============================================================
+#  EX200 LAB CONFIGURATION FILE
+#  LAB: lab_01_boolean
+# =============================================================
+
 set -euo pipefail
 IFS=$'\n\t'
 
 # =============================================================
-# LAB IDENTIFICADOR Y DESCRIPCIÓN
+#  IDENTIDAD DEL LABORATORIO
 # =============================================================
 LAB_ID="lab_01_boolean"
+LAB_CATEGORY="selinux"
 LAB_TITLE="SELinux Booleans"
-LAB_DESCRIPTION="Activar/desactivar SELinux booleans para permitir servicios específicos dinámicamente"
+LAB_DESCRIPTION="Administración y persistencia de SELinux booleans para servicios comunes"
+LAB_VERSION="1.0"
 
 # =============================================================
-# CONFIGURACIÓN DE SELINUX BOOLEANS
+#  NIVELES DE DIFICULTAD
 # =============================================================
-# Lista de booleanos posibles a probar
-POSSIBLE_BOOLEANS=(
-    "httpd_can_network_connect"
-    "ftp_home_dir"
-    "allow_user_exec_content"
-    "nis_enabled"
-    "samba_enable_home_dirs"
-)
+# 1 = Basico
+# 2 = Intermedio
+# 3 = Avanzado
+# 4 = Super Avanzado
+LAB_DIFFICULTY_LEVEL=1
 
-# Estados posibles: on/off
-BOOLEAN_STATES=("on" "off")
-
-# Generar dinámicamente la selección de booleanos y sus estados
-# Número de booleanos a activar/desactivar en este laboratorio
-NUM_BOOLEANS=$(( ( RANDOM % ${#POSSIBLE_BOOLEANS[@]} ) + 1 ))
-
-# Seleccionar booleanos aleatorios sin repetir
-SELECTED_BOOLEANS=($(shuf -e "${POSSIBLE_BOOLEANS[@]}" -n $NUM_BOOLEANS))
-
-# Asignar un estado aleatorio a cada boolean seleccionado
-EXPECTED_STATE=()
-for b in "${SELECTED_BOOLEANS[@]}"; do
-    state=${BOOLEAN_STATES[$RANDOM % ${#BOOLEAN_STATES[@]}]}
-    EXPECTED_STATE+=("$state")
-done
-
-# =============================================================
-# SERVICIOS RELACIONADOS (para comprobar funcionamiento)
-# =============================================================
-TARGET_SERVICES=(
-    "httpd"
-    "ftp"
-    "smbd"
-    "named"
+declare -A LAB_DIFFICULTY_NAME=(
+    [1]="Basico"
+    [2]="Intermedio"
+    [3]="Avanzado"
+    [4]="Super Avanzado"
 )
 
 # =============================================================
-# RUTAS, FLAGS Y DEPURACIÓN
-# =============================================================
-LOG_PATH="/tmp/selinux_${LAB_ID}.log"
-CLEANUP_AFTER_RUN=true
-DEBUG_MODE=false
-
-# =============================================================
-# CONEXIÓN REMOTA A VM2 (si aplica)
+#  CONEXIÓN REMOTA (VM OBJETIVO)
 # =============================================================
 REMOTE_HOST="192.168.122.110"
 REMOTE_USER="student"
 REMOTE_PASS="redhat"
 
 # =============================================================
-# FUNCIONES AUXILIARES
+#  REGLAS DEL LABORATORIO
 # =============================================================
+REQUIRES_PERSISTENCE=true        # Se espera uso de setsebool -P
+ALLOW_TEMPORARY_CHANGES=false   # No se aceptan cambios sin persistencia
+TIME_LIMIT_MINUTES=45
 
-# Mostrar configuración generada
-print_lab_config() {
-    echo "==================================================="
-    echo "LAB CONFIGURATION: $LAB_ID - $LAB_TITLE"
-    echo "---------------------------------------------------"
-    for i in "${!SELECTED_BOOLEANS[@]}"; do
-        echo "Boolean: ${SELECTED_BOOLEANS[$i]} → Expected State: ${EXPECTED_STATE[$i]}"
-    done
-    echo "Target Services: ${TARGET_SERVICES[*]}"
-    echo "Log Path: $LOG_PATH"
-    echo "Cleanup after run: $CLEANUP_AFTER_RUN"
-    echo "Remote Host: $REMOTE_HOST"
-    echo "==================================================="
+# =============================================================
+#  POLÍTICAS SEGÚN DIFICULTAD
+# =============================================================
+# Estas variables son leídas por generator.sh
+case "$LAB_DIFFICULTY_LEVEL" in
+    1)  # BASICO
+        MIN_BOOLEANS=1
+        MAX_BOOLEANS=2
+        REQUIRE_SERVICE_VALIDATION=false
+        INCLUDE_TROUBLESHOOTING=false
+        ;;
+    2)  # INTERMEDIO
+        MIN_BOOLEANS=2
+        MAX_BOOLEANS=3
+        REQUIRE_SERVICE_VALIDATION=true
+        INCLUDE_TROUBLESHOOTING=false
+        ;;
+    3)  # AVANZADO
+        MIN_BOOLEANS=3
+        MAX_BOOLEANS=4
+        REQUIRE_SERVICE_VALIDATION=true
+        INCLUDE_TROUBLESHOOTING=true
+        ;;
+    4)  # SUPER AVANZADO
+        MIN_BOOLEANS=4
+        MAX_BOOLEANS=5
+        REQUIRE_SERVICE_VALIDATION=true
+        INCLUDE_TROUBLESHOOTING=true
+        REQUIRE_AUDIT_LOG_ANALYSIS=true
+        ;;
+    *)
+        echo "ERROR: Nivel de dificultad inválido"
+        exit 1
+        ;;
+esac
+
+# =============================================================
+#  BOOLEANS DISPONIBLES (EX200-ALIGNED)
+# =============================================================
+# Esta lista es la única fuente permitida
+AVAILABLE_BOOLEANS=(
+    "httpd_can_network_connect"
+    "httpd_enable_homedirs"
+    "ftp_home_dir"
+    "samba_enable_home_dirs"
+)
+
+# =============================================================
+#  SERVICIOS RELACIONADOS
+# =============================================================
+SERVICE_MAP=(
+    "httpd_can_network_connect:httpd"
+    "httpd_enable_homedirs:httpd"
+    "ftp_home_dir:vsftpd"
+    "samba_enable_home_dirs:smb"
+)
+
+# =============================================================
+#  FLAGS OPERATIVOS
+# =============================================================
+DEBUG_MODE=false
+CLEANUP_AFTER_RUN=false
+LOG_PATH="/tmp/selinux_${LAB_ID}.log"
+
+# =============================================================
+#  FUNCIÓN DE DEBUG (USO INTERNO)
+# =============================================================
+debug() {
+    [[ "$DEBUG_MODE" == "true" ]] && echo "[DEBUG] $*"
 }
