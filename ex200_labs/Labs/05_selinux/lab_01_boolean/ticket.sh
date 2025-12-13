@@ -11,6 +11,8 @@ mostrar_ticket() {
     # Cargar variables dinámicas si no están definidas
     if [ -z "${LAB_ID:-}" ]; then
         source ./config.sh
+        source ./generator.sh
+        generate_lab_scenario >/dev/null
     fi
 
     clear
