@@ -4,67 +4,82 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # =============================================================
-# CARGAR CONFIGURACIÓN
+#  VALIDATOR REMOTO – SELINUX BOOLEANS (EX200 STYLE)
 # =============================================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/config.sh"
+source "${SCRIPT_DIR}/generator.sh"
 
-# =============================================================
-# FUNCIONES AUXILIARES
-# =============================================================
-
-# Función para ejecutar comandos remotos en VM2
 run_remote() {
-    local cmd="$1"
-    sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "${REMOTE_USER}@${REMOTE_HOST}" "$cmd"
+    sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no \
+        "${REMOTE_USER}@${REMOTE_HOST}" "$1"
 }
 
-# Función para validar un boolean
-validate_boolean() {
-    local boolean_name="$1"
-    local expected_state="$2"
-    
-    local actual_state
-    actual_state=$(run_remote "getsebool ${boolean_name}" | awk '{print $3}')
-    
-    if [[ "$actual_state" == "$expected_state" ]]; then
-        echo "✅ Boolean ${boolean_name}: ${actual_state} (OK)"
-        return 0
-    else
-        echo "❌ Boolean ${boolean_name}: ${actual_state} (Expected: ${expected_state})"
-        return 1
-    fi
-}
+remote_validator() {
 
-# =============================================================
-# VALIDACIÓN DEL LABORATORIO
-# =============================================================
-run_validation() {
-    echo "==================================================="
-    echo "VALIDACIÓN LAB: $LAB_ID - $LAB_TITLE"
-    echo "---------------------------------------------------"
+    successes=()
+    errors=()
 
-    local failures=0
+    echo "[*] Iniciando validación remota en ${REMOTE_USER}@${REMOTE_HOST}..."
+
     for i in "${!SELECTED_BOOLEANS[@]}"; do
         boolean="${SELECTED_BOOLEANS[$i]}"
         expected="${EXPECTED_STATES[$i]}"
-        if ! validate_boolean "$boolean" "$expected"; then
-            ((failures++))
+
+        # Estado actual
+        actual=$(run_remote "getsebool ${boolean} 2>/dev/null" | awk '{print $3}')
+
+        if [[ "$actual" == "$expected" ]]; then
+            successes+=("✅ ${boolean} = ${actual}")
+        else
+            errors+=("❌ ${boolean} = ${actual} (esperado: ${expected})")
+        fi
+
+        # Persistencia
+        if [[ "$REQUIRES_PERSISTENCE" == "true" ]]; then
+            persistent=$(run_remote "semanage boolean -l | awk '/^${boolean}[[:space:]]/ {print \$3}'")
+
+            if [[ "$persistent" == "$expected" ]]; then
+                successes+=("✅ Persistente: ${boolean}")
+            else
+                errors+=("❌ ${boolean} NO persistente (semanage)")
+            fi
         fi
     done
 
-    echo "---------------------------------------------------"
-    if [[ $failures -eq 0 ]]; then
-        echo "🎉 RESULTADO: APROBADO - Todos los booleanos correctos"
-    else
-        echo "⚠ RESULTADO: FALLIDO - $failures booleanos incorrectos"
+    echo ""
+    echo -e "${BLUE}==================== INFORME DE VALIDACIÓN ====================${NC}"
+    echo -e "${CYAN}LAB: ${LAB_ID} – ${LAB_TITLE}${NC}"
+    echo -e "${CYAN}HOST: ${REMOTE_HOST}${NC}"
+    echo ""
+
+    if [ ${#successes[@]} -gt 0 ]; then
+        echo -e "${GREEN}✅ LOGROS:${NC}"
+        for s in "${successes[@]}"; do
+            echo "  ${s}"
+        done
+        echo ""
     fi
-    echo "==================================================="
+
+    if [ ${#errors[@]} -eq 0 ]; then
+        echo -e "${GREEN}🎉 RESULTADO: APROBADO${NC}"
+        echo "Todos los criterios SELinux fueron cumplidos correctamente."
+    else
+        echo -e "${RED}❌ RESULTADO: REPROBADO${NC}"
+        echo -e "${YELLOW}FALTANTES / ERRORES:${NC}"
+        for e in "${errors[@]}"; do
+            echo "  ${e}"
+        done
+    fi
+
+    echo -e "${BLUE}===============================================================${NC}"
 }
 
 # =============================================================
 # EJECUCIÓN
 # =============================================================
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    run_validation
+    generate_lab_scenario >/dev/null
+    remote_validator
 fi

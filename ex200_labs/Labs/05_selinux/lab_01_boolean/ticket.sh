@@ -9,9 +9,10 @@ RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'; CY
 mostrar_ticket() {
 
     # Cargar variables dinámicas si no están definidas
-    if [ -z "${LAB_ID:-}" ]; then
-        source ./config.sh
-        source ./generator.sh
+    if [ -z "${SELECTED_BOOLEANS+x}" ]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        source "${SCRIPT_DIR}/config.sh"
+        source "${SCRIPT_DIR}/generator.sh"
         generate_lab_scenario >/dev/null
     fi
 
@@ -34,7 +35,8 @@ mostrar_ticket() {
     echo ""
     echo -e "${GREEN}💻 TAREAS PENDIENTES:${NC}"
     for i in "${!SELECTED_BOOLEANS[@]}"; do
-        echo "1.$((i+1)) Ajustar boolean: ${SELECTED_BOOLEANS[$i]} → ${EXPECTED_STATES[$i]}"
+        echo "$((i+1)). Ajustar boolean: ${SELECTED_BOOLEANS[$i]} → ${EXPECTED_STATES[$i]}"
+
     done
     echo ""
     echo -e "${GREEN}✅ CRITERIOS DE ACEPTACIÓN:${NC}"
@@ -46,3 +48,7 @@ mostrar_ticket() {
     echo "Tiempo límite: 45 minutos. Cambios deben persistir tras reinicio."
     echo -e "${RED}=======================================================================${NC}"
 }
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    mostrar_ticket
+fi
